@@ -4,9 +4,7 @@ import numpy as np
 # TODO: Implement the reward function as described in Gymnasium documentation.
 # The end-state is always at [env_size-1,env_size-1].
 def reward_function(s, env_size):
-    r = ... # ?
-
-    return r
+    return 1 if np.all(s == np.array([env_size-1, env_size-1])) else 0
 
 # do not modify this function
 def reward_probabilities(env_size):
@@ -23,9 +21,9 @@ def reward_probabilities(env_size):
 # Check feasibility of the new state.
 # If it is a possible state return s_prime, otherwise return s
 def check_feasibility(s_prime, s, env_size, obstacles):
-  # TODO
-
-  return s
+  if np.any(s_prime < 0) or np.any(s_prime >= env_size) or obstacles[s_prime[0], s_prime[1]]:
+      return s
+  return s_prime
 
 def transition_probabilities(env, s, a, env_size, directions, obstacles):
     prob_next_state = np.zeros((env_size, env_size))
@@ -33,13 +31,11 @@ def transition_probabilities(env, s, a, env_size, directions, obstacles):
     # TODO
     # Fill in the cells corresponding to the next possible states with the probability of visiting each of them
     # Remember to check the feasibility of each new state!
-    s_prime = ... # ??
-    prob_next_state[s_prime[0], s_prime[1]] = ... # ???
 
-    s_prime = ... # ??
-    prob_next_state[s_prime[0], s_prime[1]] = ... # ???
+    for i in [0, 1, -1]:
+        s_prime = s + directions[(a+i)%4]
+        s_prime = check_feasibility(s_prime, s, env_size, obstacles)
+        prob_next_state[s_prime[0], s_prime[1]] += 1/3 
 
-    s_prime = ... # ??
-    prob_next_state[s_prime[0], s_prime[1]] = ... # ???
 
     return prob_next_state
