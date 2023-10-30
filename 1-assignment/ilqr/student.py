@@ -66,7 +66,11 @@ class ILqr:
         
         for t in range(len(u_seq)):
             # TODO edit this!!!!!
-            control = k_seq[t] + K_seq[t]@(x_seq_hat[t] - x_seq_hat[t])
+            # print(t)
+            # print(f'hat: {x_seq_hat[t]}')
+            # print(f'x: {x_seq[t]}')
+            # print('----------')
+            control = k_seq[t] + K_seq[t]@(x_seq_hat[t] - x_seq[t])
             
             # clip controls to the actual range from gymnasium
             u_seq_hat[t] = np.clip(u_seq[t] + control,-2,2)

@@ -12,7 +12,7 @@ def main():
     parser.add_argument('--render', action='store_true')
     parser.add_argument('--episodes', type=int, default=3)
     args = parser.parse_args()
-    render = args.render
+    render = True #args.render
     ilqr = ILqr(pendulum_dyn, cost, horizon=20)
 
     env = gym.make("Pendulum-v1", render_mode="human" if render else "rgb_array")
@@ -30,6 +30,7 @@ def main():
 
 def episode(env, ilqr):
     state, _ = env.reset()
+    print(state)
     total_reward = 0.0
 
     u_seq = [np.array((0.0,)) for _ in range(ilqr.horizon)]
