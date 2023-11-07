@@ -41,10 +41,13 @@ class ILqr:
             Qt = self.getQ(xt,ut)
             Rt = self.getR(xt,ut)
 
-            # TODO
+            # Equations to compute the K and k (additional terms coming 
+            # from the 2 order Taylor expansion of the cost)
             kt = -np.linalg.inv(Rt + Bt.T@Pt1@Bt)@(rt + Bt.T@pt1)
             Kt = -np.linalg.inv(Rt + Bt.T@Pt1@Bt)@(Bt.T@Pt1@At)
-            # TODO
+            
+            # Equations to compute the P and p (additional terms coming 
+            # from the 2 order Taylor expansion of the cost)
             pt = qt + Kt.T@(Rt@kt + rt) + (At + Bt@Kt).T@pt1 + (At + Bt@Kt).T@Pt1@Bt@kt
             Pt = Qt + Kt.T@Rt@Kt + (At + Bt@Kt).T@Pt1@(At + Bt@Kt)
 
@@ -65,11 +68,7 @@ class ILqr:
         u_seq_hat = np.array(u_seq)
         
         for t in range(len(u_seq)):
-            # TODO edit this!!!!!
-            # print(t)
-            # print(f'hat: {x_seq_hat[t]}')
-            # print(f'x: {x_seq[t]}')
-            # print('----------')
+            # the control law
             control = k_seq[t] + K_seq[t]@(x_seq_hat[t] - x_seq[t])
             
             # clip controls to the actual range from gymnasium
@@ -97,7 +96,7 @@ def pendulum_dyn(x,u):
 
     u = np.clip(u, -2, 2)[0]
 
-    # TODO
+    # Implemented pendulum dynamics as described in Gymnasium documentation
     newthdot = thdot + ((3*g/2*l)*np.sin(th) + (3.0/m*(l**2))*u)*dt
     newth = th + newthdot*dt
     
