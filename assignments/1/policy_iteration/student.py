@@ -19,7 +19,6 @@ def reward_probabilities(env_size):
 # Check feasibility of the new state.
 # If it is a possible state return s_prime, otherwise return s
 def check_feasibility(s_prime, s, env_size, obstacles):
-#   or obstacles[s_prime[0], s_prime[1]]
   if np.any(s_prime < 0) or np.any(s_prime >= env_size):
       return s
   return s_prime
