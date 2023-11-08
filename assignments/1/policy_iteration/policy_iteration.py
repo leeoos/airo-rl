@@ -30,7 +30,7 @@ def policy_iteration(env, env_size, end_state, directions, obstacles, gamma=0.99
               # deterministic policy, so no need for weighted sum over actions
               a = policy[s]
               next_state_prob = transition_probabilities(env, state, a, env_size, directions, obstacles).flatten()
-              done = (state == end_state).all()
+              done = (state == end_state).all() or obstacles[state[0]][state[1]]
               values[s] = (1-done)*(next_state_prob*(REWARDS + gamma*values)).sum()
               delta = max(delta, np.abs(v_old - values[s]))
           if delta < theta:
