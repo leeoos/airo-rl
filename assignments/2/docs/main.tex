@@ -1,0 +1,154 @@
+\documentclass[10pt,a4paper]{article}
+
+% Standard required packages
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,bm,mathtools,amssymb} % math packages
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks,
+    citecolor=black,
+    filecolor=black,
+    linkcolor=black,
+    urlcolor=black
+}
+
+\begin{document}
+
+\begin{titlepage}
+    \begin{center}
+        \vspace*{1cm}
+        \Huge\textbf{Assignment 2}\\
+        \vspace{1.5cm}
+        \Large Author:
+        \textbf{Leonardo Colosi 1799057}\\
+        \vspace{0.5cm}
+        \Large Contributors: \textbf{Bruno Francesco Nocera 1863075, Silverio Manganaro 1817504, Simone Tozzi, 1615930, Paolo Renzi 1887793, Jacopo Tedeschi 1882789, Amine Ahardane 2050689.}
+        \vfill
+        \includegraphics[width=0.7\textwidth]{images/sapienza_logo.png}
+        \vfill
+        \vspace{0.8cm}
+        \Large \textit{MARR, RL}\\
+        \today
+    \end{center}
+\end{titlepage}
+\newpage
+
+\tableofcontents
+\newpage
+
+\section{Theory}
+\subsection{Exercise 1}
+Given the following table:
+
+\newpage
+
+
+\subsection{Exercise 2}
+We have a set of seven states: $\{S_1$, ..., $S_7\}$ and a policy: $\pi(s) = a \:\:\: \forall s$. \\
+The reward function is defined as:
+\begin{center}
+    \begin{equation*}
+        r(s,a) =
+        \begin{cases*}
+            $1/2$   & if $s = s_1$ \\
+            $5$     & if $s = s_7$ \\
+            $0$     & otherwise \\
+        \end{cases*}
+    \end{equation*}
+\end{center}
+\vspace{5pt}
+The transition probability (dynamics of the system) is given for the state $s_6$ as:
+\begin{itemize}
+    \item $P(s_6 \:| \:s_6, \:a_1) \:= 0.3$
+    \item $P(s_7 \:| \:s_6, \:a_1) \:= 0.7$ 
+\end{itemize}
+\vspace{5pt}
+We also have an initialization for the Value Function at $k = 1$: 
+\vspace{5pt}
+\begin{center}
+    \begin{math}
+        V_k \:= \:[0.5,\:0,\:0,\:0,\:0,\:0,\:5]
+    \end{math}
+\end{center}
+Setting a fixed value $\gamma = 0.9$, for the discount factor, we can compute $V_{k+1}(s_6)$ following the \textit{Value Iteration} algorithm:
+\vspace{5pt}
+% \setcounter{equation}{0}
+\begin{align}
+&& V(s_6) = r(s_6) + \gamma \mathbb{E}_{s' \sim P(\bullet | s_6, \pi\{s_6\})}V(s') \nonumber && 1\\
+&& && \notag \\
+&&  V(s_6) = 0 + 0.9 \cdot [\mathbb{E}_{s' \sim P(\bullet | s_6, \pi\{s_6\})}V(s')] \nonumber && 2\\ 
+&& && \notag  \\
+&&  V(s_6) = 0 + 0.9 \cdot [P(s_{6} | s_{6}, a_{1})V(s_{6}) + P(s_{7} | s_{6}, a_{1})V(s_{7}))] \nonumber && 3\\ 
+&& && \notag  \\
+&&  V(s_6) = 0.9 \cdot [0.3\cdot V(s_{6}) + 0.7 \cdot V(s_{7}))] \nonumber && 4\\ 
+&& && \notag  \\
+&&  V(s_6) = 0.9 \cdot 0.35 = 3.15 \nonumber && 5
+\end{align}
+
+\vspace{10pt}
+\noindent The steps of the computation the computation are:
+\begin{enumerate}
+    \item Expansion of the value function as sum of discounted rewards;
+    \item Substitution of $\gamma$ and $r(s_6)$ with numerical values;
+    \item Expansion of the Expected value as a weighted sum, where the weights are transition probabilities;
+    \item Substitution of probabilities and Value function output with the given data.
+\end{enumerate}
+\newpage
+
+\section{Code Implementation}
+\subsection{Policy Iteration}
+In this first part of the practical assignment our goal was to implement the transition probabilities and the reward function of the \textit{FrozenLake Gymnasium} environment according to the guidelines:
+\begin{itemize}
+    \item The reward function must return 0 everywhere and 1 for the goal cell;
+    \item The transition probabilities must be such that the agent moves in the right direction with probability 1/3, and instead moves in one of the perpendicular directions with probabilities 1/3 and 1/3.
+\end{itemize} 
+In addiction to this we could established that if one or more of the three possible direction of movement, the right one and the two perpendicular to that, is unfeasible then the probability of make that movement should be added to the probability of remaining in the same spot.\\
+
+\noindent For example if the chosen action is move to the LEFT then we would have a probability of 1/3 to move on the left, of 1/3 to move up and of 1/3 to move down. But if the block on the left and the one up are both not feasible states then we would have a probability of 1/6 to stay on the spot and a probability of 1/3 to make a move down.\\
+
+\noindent Here is it the code that does that:
+\begin{lstlisting}
+def transition_probabilities(env, s, a, env_size, directions, obstacles):
+    prob_next_state = np.zeros((env_size, env_size))
+
+    for i in [0, 1, -1]:
+        s_prime = s + directions[(a+i)%4]
+        s_prime = check_feasibility(s_prime, s, env_size, obstacles)
+        prob_next_state[s_prime[0], s_prime[1]] += 1/3 
+        
+    return prob_next_state
+\end{lstlisting}
+Because of the "slippery" probability the agent can still end up in the ice pit during the execution of the simulation.
+\newpage
+
+\subsection{iLQR}
+This second task was about implementing an \textit{iLQR} controller to keep a mechanical pendulum stable in an horizontal position (a point of non stable equilibrium). Knowing that the pendulum dynamics is given by:
+\begin{align}
+    \dot{\theta}_{t+1} \:=\: \dot{\theta} \:+\: \left( \frac{3g}{2l} \sin{\theta} \:+\: \frac{3.0}{ml^{2}}u\right) \\
+    && && \notag  \\
+    \theta_{t+1} \:=\: \theta \:+\: \dot{\theta}_{t+1} dt
+\end{align}
+\vspace{2pt}
+the formulas to compute the P and K matrices could be derived from the \textit{LQR-LTV} algorithm. In particular in the backward function we have: 
+\begin{align}
+    k_t \:=\: -(R_t \:+\: B_{t}^{T} P_{t+1} B_{t})^{-1}  (r_{t} + B_{t}^{T} p_{t+1}) \\
+    \notag  \\
+    K_t = -(R_t \:+\: B_{t}^{T}  P_{t+1} B_t)^{-1} (B_{t}^{T} P_{t+1} A_t) \\
+    \notag  \\
+    p_t \:=\: q_t +K_{t}^{T} (R_{t} k_t +r_t) + (A_t + B_t K_t)^{T} p_{t+1} + (A_t + B_t K_t)^{T} P_{t+1} B_{t} k_t \\
+   \notag  \\
+    P_t = Q_{t} \:+\: K_{t}^{T} R_{t} K_{t} \:+\: (A_t \:+\: B_t K_t)^{T} P_{t+1} (A_t + B_t K_t)
+\end{align}\\
+\vspace{5pt}
+
+\noindent In the forward function the controller has been implemented as follows:
+\begin{align}
+    control = k_{t} + K_{t} (x_{t}^{i} - x_{t}^{i-1})
+\end{align}
+where $x_{t}^{i-1}$ is the reference trajectory while $x_{t}^{i}$ is the new state of the system after the application of the control law. It is important to notice that the final value for the cost function as well as the time needed for the pendulum stabilization are both influenced by the random initial configuration of the system. This observation is also evident in the graphical rendering provided by Gymnasium.
+
+\end{document}
