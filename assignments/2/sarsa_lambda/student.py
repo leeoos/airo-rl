@@ -45,11 +45,13 @@ def sarsa_lambda(env, alpha=0.2, gamma=0.99, lambda_= 0.9, initial_epsilon=1.0, 
             # TODO update q table and eligibility
             delta = reward + (gamma*(1-done)*Q[next_state,next_action]) - Q[state,action]
             E[state,action] += 1
+            Q[state,action] = Q[state,action] + alpha*delta*E[state,action]
+            E[state,action] = gamma*lambda_*E[state,action]
             
-            for s in range(env.observation_space.n):
-                for a in range(env.action_space.n):
-                    Q[s,a] = Q[s,a] + alpha*delta*E[s,a]
-                    E[s,a] = gamma*lambda_*E[s,a]
+            # for s in range(env.observation_space.n):
+            #     for a in range(env.action_space.n):
+            #         Q[s,a] = Q[s,a] + alpha*delta*E[s,a]
+            #         E[s,a] = gamma*lambda_*E[s,a]
 
             if not received_first_reward and reward > 0:
                 received_first_reward = True
