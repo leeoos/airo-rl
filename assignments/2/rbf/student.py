@@ -25,17 +25,19 @@ class VanillaFeatureEncoder:
 class RBFFeatureEncoder:
     def __init__(self, env): # modify
         self.env = env
+        # self.n
         # TODO init rbf encoder
-        ...
+        self.encoder =  RBFSampler(gamma=1, random_state=1)
 
     def encode(self, state): # modify
         # TODO use the rbf encoder to return the features
-        return ...
+        features = self.encoder.fit_transform(state)
+        return features
 
     @property
     def size(self): # modify
         # TODO return the number of features
-        return ...
+        return 100
 
 class TDLambda_LVFA:
     def __init__(self, env, feature_encoder_cls=VanillaFeatureEncoder, alpha=0.01, alpha_decay=1, 
@@ -60,13 +62,19 @@ class TDLambda_LVFA:
     def update_transition(self, s, action, s_prime, reward, done): # modify
         s_feats = self.feature_encoder.encode(s)
         s_prime_feats = self.feature_encoder.encode(s_prime)
+        
         # TODO update the weights
-        print(self.weights[action])
-        print(f'shape: {self.weights.shape}')
+        # compute TD-Error
+        td_error = (reward + self.gamma*np.max(self.Q(s_prime_feats)) - self.Q(s_feats)[action])[0]
 
-        delta = reward + self.gamma*np.max(self.weights@s_prime_feats) - (self.weights@s_feats)[action]
-        self.traces[action] = self.gamma *self.lambda_*self.traces
-        self.weights[action] += self.alpha*delta*self.traces
+        # Updtae elegibility traces
+        self.traces = self.gamma*self.lambda_*self.traces + s_feats
+        
+        # Update weights
+        self.weights[action] += self.alpha*td_error*self.traces[action]
+
+        # Reset elegibility traces when state is terminal
+        if done: self.traces = np.zeros(self.shape)
         
     def update_alpha_epsilon(self): # do not touch
         self.epsilon = max(self.final_epsilon, self.epsilon*self.epsilon_decay)
@@ -94,6 +102,7 @@ class TDLambda_LVFA:
                 action = self.epsilon_greedy(s)
                 s_prime, reward, done, _, _ = self.env.step(action)
                 self.update_transition(s, action, s_prime, reward, done)
+                break
                 
                 s = s_prime
                 
