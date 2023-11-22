@@ -38,7 +38,7 @@ class RBFFeatureEncoder:
         return ...
 
 class TDLambda_LVFA:
-    def __init__(self, env, feature_encoder_cls=RBFFeatureEncoder, alpha=0.01, alpha_decay=1, 
+    def __init__(self, env, feature_encoder_cls=VanillaFeatureEncoder, alpha=0.01, alpha_decay=1, 
                  gamma=0.9999, epsilon=0.3, epsilon_decay=0.995, final_epsilon=0.2, lambda_=0.9): # modify if you want (e.g. for forward view)
         self.env = env
         self.feature_encoder = feature_encoder_cls(env)
@@ -61,7 +61,12 @@ class TDLambda_LVFA:
         s_feats = self.feature_encoder.encode(s)
         s_prime_feats = self.feature_encoder.encode(s_prime)
         # TODO update the weights
-        self.weights[action] += ...
+        print(self.weights[action])
+        print(f'shape: {self.weights.shape}')
+
+        delta = reward + self.gamma*np.max(self.weights@s_prime_feats) - (self.weights@s_feats)[action]
+        self.traces[action] = self.gamma *self.lambda_*self.traces
+        self.weights[action] += self.alpha*delta*self.traces
         
     def update_alpha_epsilon(self): # do not touch
         self.epsilon = max(self.final_epsilon, self.epsilon*self.epsilon_decay)
