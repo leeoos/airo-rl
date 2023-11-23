@@ -45,8 +45,10 @@ def sarsa_lambda(env, alpha=0.2, gamma=0.99, lambda_= 0.9, initial_epsilon=1.0, 
             # TODO update q table and eligibility
             delta = reward + (gamma*(1-done)*Q[next_state,next_action]) - Q[state,action]
             E[state,action] += 1
-            Q[state,action] = Q[state,action] + alpha*delta*E[state,action]
-            E[state,action] = gamma*lambda_*E[state,action]
+            # Q[state,action] = Q[state,action] + alpha*delta*E[state,action]
+            Q = Q + alpha*delta*E
+            # E[state,action] = gamma*lambda_*E[state,action]
+            E = gamma*lambda_*E
             
             # for s in range(env.observation_space.n):
             #     for a in range(env.action_space.n):

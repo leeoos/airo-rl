@@ -63,7 +63,7 @@ Given the following table:
     \item Q-Learning 
     \item SARSA in the case $a' \:=\: \pi_{\epsilon}(s^{\prime}) \:=\: 2$
 \end{enumerate} 
-1. In the case of Q-Learing we can procede using the following update rule:
+1. In the case of Q-Learning we can proceed using the following update rule:
 \begin{equation*}
     Q(s,a) = Q(s,a) \:+\: \alpha [ \:r \:+\: \gamma(max_{a}Q(s^{\prime},a')) \:-\: Q(s,a)]
 \end{equation*}
@@ -97,14 +97,72 @@ in this case $a'=2$, so we would have:
 
 
 \subsection{Exercise 2}
+The goal of this exercise is to prove that the n-step error can also be written as a sum of TD errors if the value estimates do not
+change from step to step. In other words we have to show that the following equation is true:
+\begin{equation}
+    G_{t:t+n} \:-\: V_{t+n-1}(S_t) \:=\: \sum_{k=t}^{t+n-1} \gamma^{k-t} \delta_{k}
+\end{equation}
+\vspace{5pt}
 
+\noindent In order to proceed with the demonstration we can expand the left side of the equation by taking in account that: 
+\begin{equation}
+    G_{t:t+n}  \:=\: R_{t+1} \:+\: \gamma R_{t+2} \:+\: ... \:+\: \gamma^{n-1}R_{t+n} \:+\: \gamma^{n}V_{t+n-1}(S_{t+n}) 
+\end{equation}
+\vspace{5pt}
+\noindent After making the expansion we obtain:
+% \setcounter{equation}{0}
+\begin{flalign*}
+    &G_{t:t+n} \:-\: V_{t+n-1}(S_t) \:=\:  R_{t+1} \:+\: \gamma R_{t+2} \:+\: ... \:+\: \gamma^{n-1}R_{t+n} \:+\: \gamma^{n}V_{t+n-1}(S_{t+n}) \:-\: V_{t+n-1}(S_t)&\\
+    &&\\
+    &\:=\:  R_{t+1} \:+\: \gamma R_{t+2} \:+\: ... \:+\: \gamma^{n-1}R_{t+n} \:+\: \gamma^{n}V_{t+n-1}(S_{t+n}) \:-\: V_{t+n-1}(S_t)& 1.&\\
+    &&\\
+    &\:=\:  R_{t+1} \:+\: \gamma R_{t+2} \:+\: ... \:+\: \gamma^{n-1}R_{t+n} \:+\: \gamma^{n}V(S_{t+n}) \:-\: V(S_t) & 2.&\\
+    &&\\
+    &\:=\:  \delta_t \:-\: \gamma V(S_{t+1}) \:+\: V(S_t) \:+\: \gamma R_{t+2} \:+\: ... \:+\: \gamma^{n-1}R_{t+n} \:+\: \gamma^{n}V(S_{t+n}) \:-\: V(S_t) & 3.& \\
+    &&\\
+    &\:=\: [\delta_t \:-\: \gamma V(S_{t+1}) \:+\: V(S_t)] \:+\: \gamma[\delta_{t+1} \:-\: \gamma V(S_{t+2}) \:+\: V(S_{t+1})]  \:+\: ...&\\
+    &... \:+\: \gamma^{n-1} [\delta_{t+n-1} \:-\: \gamma V(S_{t+n}) \:+\: V(S_{t+n-1})] \:+\: \gamma^{n}V(S_{t+n}) \:-\: V(S_t)& 4.& \\
+    &&\\
+    &\sum_{k=t}^{t+n-1} [\gamma^{k-t}\delta_k \:-\: \gamma^{k-t+1} V(S_{k+1}) \:+\: \gamma^{k-t}V(S_k)] \:+\: \gamma^{n}V(S_{t+n}) \:-\: V(S_t) & 5.& \\
+    &&\\
+    &\sum_{k=t}^{t+n-1} [\gamma^{k-t}\delta_k] \:-\: \sum_{k=t}^{t+n-1} [\gamma^{k-t+1} V(S_{k+1})] \:+\: \gamma^{n}V(S_{t+n}) \:+\: \sum_{k=t}^{t+n-1} [\gamma^{k-t}V(S_k)] \:-\: V(S_t) & 6.&
+\end{flalign*}
+\vspace{5pt}
+\begin{itemize}
+    \item[2.] Substituting $V_t$ with $V$, under the assumpion that it does not change.
+    \item[3.] Recalling that $\delta_t  \:=\: R_{t+1} \:+\: \gamma V(S_{t+n}) \:-\: V(S_t)$.
+    \item[4.] Iterating the process of the previous steps for all the rewards $R_t$.
+    \item[5.] Collecting the similar terms into a single summation.
+    \item[6.] Splitting the summation in three parts, this will be useful to verify the presence of similar terms with opposite sign.
+\end{itemize}
 \newpage
 
+\noindent We can rewrite the second summation at step 6. as: 
+\begin{equation*}
+    \:-\sum_{k=t}^{t+n-1} [\gamma^{k-t+1} V(S_{k+1})] \:+\: \gamma^{n}V(S_{t+n}) \:=\: \:-\sum_{k=t}^{t+n-2} [\gamma^{k-t+1} V(S_{k+1})] \:=\: \:-\sum_{k=t+1}^{t+n-1} [\gamma^{k-t}V(S_k)]
+\end{equation*}
+\vspace{5pt}
+And the third summation at the same step as well:
+\begin{equation*}
+    \sum_{k=t}^{t+n-1} [\gamma^{k-t}V(S_k)] \:-\: V(S_t) \:=\: \sum_{k=t+1}^{t+n-1} [\gamma^{k-t}V(S_k)]
+\end{equation*}
+\vspace{5pt}
+In this way our final equation becomes:
+\begin{equation*}
+    G_{t:t+n} \:-\: V_{t+n-1}(S_t) \:=\: \sum_{k=t}^{t+n-1} [\gamma^{k-t}\delta_k] \:-\sum_{k=t+1}^{t+n-1} [\gamma^{k-t}V(S_k)] \:+\: \sum_{k=t+1}^{t+n-1} [\gamma^{k-t}V(S_k)]
+\end{equation*}
+\vspace{5pt}
+Which simplify in:
+\begin{equation*}
+    G_{t:t+n} \:-\: V_{t+n-1}(S_t) \:=\: \sum_{k=t}^{t+n-1} \gamma^{k-t}\delta_k
+\end{equation*}
+
+\newpage
 \section{Code Implementation}
-\subsection{Policy Iteration}
+\subsection{RBF Q-Learning}
 
 \newpage
 
-\subsection{iLQR}
+\subsection{SARSA-Lambda}
 
 \end{document}
