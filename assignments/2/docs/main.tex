@@ -191,7 +191,7 @@ Q = Q + alpha*delta*E
 E = gamma*lambda*E
 \end{lstlisting}
 In the first line is computed the TD error as: $\delta_t  \:=\: R_{t+1} \:+\: \gamma Q(s_{t+n}, a_{t+1}) \:-\: Q(s_t, a_t)$, then used in the update of the Q table. In the second line we add 1 to the entry of the eligibility trace relative to the current state-action pair, in order to take in account the frequency of the visits for a given state. The last two raws perfoms the actual update of the two tables accordingly to the update rules.
-
+\newpage
 \subsection{RBF Q-Learning}
 
 \newpage
