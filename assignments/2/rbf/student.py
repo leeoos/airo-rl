@@ -27,25 +27,26 @@ class RBFFeatureEncoder:
         self.env = env
 
         # TODO init rbf encoder
+        # Set up sklearn scaler function
         self.state_dim = self.env.observation_space.shape[0]
         self.scaler = sklearn.preprocessing.StandardScaler()
+        
+        # Sampling a sequence of states to fit rbf
         self.n_samples = 1000
+        sampled_states = np.array([env.observation_space.sample() for x in range(self.n_samples)])
+        self.scaler.fit(sampled_states) # scale the sampled data
 
+        # Set up of RBF encoder
         self.n_features = 100
         self.gamma = 0.9999
-
-        # Sampling a sequence of states to initialize rbf
-        sampled_states = np.array([env.observation_space.sample() for x in range(self.n_samples)])
-        self.scaler.fit(sampled_states)
         self.encoder =  RBFSampler(gamma=self.gamma, n_components=self.n_features)
         self.encoder.fit(self.scaler.transform(sampled_states))
-        # self.encoder.fit(sampled_states)
+        
 
     def encode(self, state): # modify
         # TODO use the rbf encoder to return the features
         scaled_state = self.scaler.transform([state])
-        features = self.encoder.transform(scaled_state)
-        return features.flatten()
+        return self.encoder.transform(scaled_state).flatten()
 
     @property
     def size(self): # modify
@@ -78,7 +79,7 @@ class TDLambda_LVFA:
 
         # TODO update the weights
         # compute TD-Error
-        td_error = (reward + self.gamma*np.max(self.Q(s_prime_feats)) - self.Q(s_feats)[action])
+        td_error = reward + self.gamma*(1-done)*np.max(self.Q(s_prime_feats)) - self.Q(s_feats)[action]
 
         # Updtae current elegibility traces
         # self.traces[action] = self.gamma*self.lambda_*self.traces[action] + s_feats

@@ -1,0 +1,35 @@
+\documentclass{article}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{violet}{RGB}{148,0,211}
+\definecolor{green}{RGB}{0,128,0}
+\definecolor{red}{RGB}{255,0,0}
+
+\lstdefinestyle{mystyle}{
+    language=Python,
+    basicstyle=\small,
+    keywordstyle=\color{violet},
+    commentstyle=\color{green},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny,
+    numbersep=5pt,
+    showstringspaces=false,
+    breaklines=true,
+    frame=leftline,
+}
+
+\lstset{style=mystyle}
+
+\begin{document}
+
+\begin{lstlisting}
+# Your Python code goes here
+def example_function():
+    print("Hello, world!")
+
+# More code...
+\end{lstlisting}
+
+\end{document}

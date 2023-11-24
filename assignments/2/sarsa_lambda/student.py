@@ -48,12 +48,7 @@ def sarsa_lambda(env, alpha=0.2, gamma=0.99, lambda_= 0.9, initial_epsilon=1.0, 
             # Q[state,action] = Q[state,action] + alpha*delta*E[state,action]
             Q = Q + alpha*delta*E
             # E[state,action] = gamma*lambda_*E[state,action]
-            E = gamma*lambda_*E
-            
-            # for s in range(env.observation_space.n):
-            #     for a in range(env.action_space.n):
-            #         Q[s,a] = Q[s,a] + alpha*delta*E[s,a]
-            #         E[s,a] = gamma*lambda_*E[s,a]
+            E = gamma*lambda_*E     
 
             if not received_first_reward and reward > 0:
                 received_first_reward = True
@@ -61,10 +56,11 @@ def sarsa_lambda(env, alpha=0.2, gamma=0.99, lambda_= 0.9, initial_epsilon=1.0, 
             # update current state
             state = next_state
             action = next_action
+
+            if done: E = np.zeros((env.observation_space.n, env.action_space.n))
         
         # print(f"Episode {ep} finished after {ep_len} steps.")
-        E = np.zeros((env.observation_space.n, env.action_space.n))
-
+   
         # update current epsilon
         if received_first_reward:
             epsilon = 0.99 * epsilon
