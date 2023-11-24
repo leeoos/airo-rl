@@ -1,35 +1,48 @@
-\documentclass{article}
+\documentclass[10pt,a4paper]{article}
+
+% Standard required packages
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,bm,mathtools,amssymb} % math packages
 \usepackage{listings}
-\usepackage{xcolor}
-
-\definecolor{violet}{RGB}{148,0,211}
-\definecolor{green}{RGB}{0,128,0}
-\definecolor{red}{RGB}{255,0,0}
-
-\lstdefinestyle{mystyle}{
-    language=Python,
-    basicstyle=\small,
-    keywordstyle=\color{violet},
-    commentstyle=\color{green},
-    stringstyle=\color{red},
-    numbers=left,
-    numberstyle=\tiny,
-    numbersep=5pt,
-    showstringspaces=false,
-    breaklines=true,
-    frame=leftline,
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{textgreek}
+\usepackage{biblatex}
+\hypersetup{
+    colorlinks,
+    citecolor=black,
+    filecolor=black,
+    linkcolor=black,
+    urlcolor=black
 }
 
-\lstset{style=mystyle}
+\addbibresource{bibliography.bib}
+
 
 \begin{document}
+\begin{titlepage}
+    \begin{center}
+        \vspace*{1cm}
+        \Huge\textbf{Project Proposal}\\
+        \vspace{1.5cm}
+        \Large Author:
+        \textbf{Leonardo Colosi 1799057}\\
+        \vspace{0.5cm}
+        \Large Contributors: \textbf{}
+        \vfill
+        \includegraphics[width=0.7\textwidth]{images/sapienza_logo.png}
+        \vfill
+        \vspace{0.8cm}
+        \Large \textit{MARR, RL}\\
+        \today
+    \end{center}
+\end{titlepage}
+\newpage
 
-\begin{lstlisting}
-# Your Python code goes here
-def example_function():
-    print("Hello, world!")
+\section{Abstract}
+text example \cite{peng2020learning}
 
-# More code...
-\end{lstlisting}
-
+\printbibliography
 \end{document}
