@@ -32,7 +32,7 @@ class RBFFeatureEncoder:
         self.scaler = sklearn.preprocessing.StandardScaler()
         
         # Sampling a sequence of states to fit rbf
-        self.n_samples = 1000
+        self.n_samples = 10000
         sampled_states = np.array([env.observation_space.sample() for x in range(self.n_samples)])
         self.scaler.fit(sampled_states) # scale the sampled data
 
@@ -78,13 +78,10 @@ class TDLambda_LVFA:
         s_prime_feats = self.feature_encoder.encode(s_prime)
 
         # TODO update the weights
-        # compute TD-Error
+        # Compute TD-Error
         td_error = reward + self.gamma*(1-done)*np.max(self.Q(s_prime_feats)) - self.Q(s_feats)[action]
 
-        # Updtae current elegibility traces
-        # self.traces[action] = self.gamma*self.lambda_*self.traces[action] + s_feats
-
-        # Updtae all elegibility traces
+        # Update all elegibility traces
         self.traces = self.gamma*self.lambda_*self.traces
         self.traces[action] += s_feats
         

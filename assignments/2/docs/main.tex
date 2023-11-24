@@ -152,7 +152,7 @@ change from step to step. In other words we have to show that the following equa
 \end{flalign*}
 \vspace{5pt}
 \begin{itemize}
-    \item[2.] Substituting $V_t$ with $V$, under the assumpion that it does not change.
+    \item[2.] Substituting $V_t$ with $V$, under the assumption that it does not change.
     \item[3.] Recalling that $\delta_t  \:=\: R_{t+1} \:+\: \gamma V(S_{t+1}) \:-\: V(S_t)$, we can write the rewards in terms of $\delta$.
     \item[4.] Iterating the process of the previous steps for all the rewards $R_t$.
     \item[5.] Collecting the similar terms into a single summation.
@@ -190,7 +190,7 @@ In this exercise we have to resolve the \textit{"Taxi-v3"} environment from gymn
     \item[b.] Implementation of SARSA-$\lambda$, which means:
     \begin{enumerate}
         \item update of the Q table;
-        \item update of the eligibility traces.
+        \item update of the elegibility traces.
     \end{enumerate}
 \end{itemize}
 \vspace{5pt}
@@ -208,7 +208,7 @@ def epsilon_greedy_action(env, Q, state, epsilon):
 
 \noindent Here the action is selected according to the result of a random sampling from an uniform probability distribution. If the sample value is lower than a given threshold $\epsilon$ the action will be choose randomly (\textit{exploration}) in the other case we will ches the best action accordingly to the q table (\textit{exploitation}).\\
 
-\noindent Regarding the second point, the pseudo-code given at \textit{Slide} 71, \textit{Pack} 7 can be taken as a reference for the implementation of the update mechanism for both the Q table and the eligibility traces. Here it is the code for the update:
+\noindent Regarding the second point, the pseudo-code given at \textit{Slide} 71, \textit{Pack} 7 can be taken as a reference for the implementation of the update mechanism for both the Q table and the elegibility traces. Here it is the code for the update:
 \begin{lstlisting}
 delta = reward + (gamma*(1-done)*Q[next_s,next_a]) - Q[s,a]
 E[s,a] += 1
@@ -219,14 +219,14 @@ In the first line is computed the TD error as:
 \begin{equation}
     \delta_t  \:=\: R_{t+1} \:+\: \gamma Q(s_{t+n}, a_{t+1}) \:-\: Q(s_t, a_t)
 \end{equation}
-then used it the update of the Q table. In the second line we add 1 to the entry of the eligibility trace relative to the current state-action pair, in order to take in account the frequency of the visits for a given state. The last two raws performs the actual update, in matrix from, of the two tables, accordingly to the update rules. In this way the learning part result much faster and the agent always reach its goal, usually taking the "safer" path.
+then used it the update of the Q table. In the second line we add 1 to the entry of the elegibility trace relative to the current state-action pair, in order to take in account the frequency of the visits for a given state. The last two raws performs the actual update, in matrix from, of the two tables, accordingly to the update rules. In this way the learning part result much faster and the agent always reach its goal, usually taking the "safer" path.
 \newpage
 \subsection{RBF Q-Learning}
 The aim of this second practical is to implement a \textit{RBF} encoder as well as the update rule for the Q-Learning algorithm. The goal of the agent (car) is to climb the hill and reach the green flag. The characteristics of the environment are specified on the gymnasium \href{https://gymnasium.farama.org/environments/classic_control/mountain_car/}{\underline{website}}. The observation is a collection of arrays where the elements correspond to position  along the x-axis and the velocity of the car.
  The implementation tasks are:
 \begin{itemize}
     \item[a.] Code an RBG encoder to enhance relevant feature from the states;
-    \item[b.] Code the backward update rule for Q-Learning with eligibility traces.
+    \item[b.] Code the backward update rule for Q-Learning with elegibility traces.
 \end{itemize}
 
 \noindent For the completion of the first it is useful to take in account the implementation of RBF on provided by sklearn. The two main function of the RBF encoder are the initialization and the actual encode, in  pseudo-code:
@@ -255,14 +255,14 @@ def encode(state):
 \noindent In the pseudo-code it can be notice how a sequence of random state is sampled from the observation space in order to "fit" the RBF encoder. This method is used to computes the parameters needed for the Radial Basis Function approximation. This involves determining the centers and widths of the RBFs based on the input data. In order to do that those data should be properly scaled, in this case this is achieved by the standard scaling function also provided by sklearn.
 
 \newpage
-\noindent For the second part of the task, the implementation of the update of the Q table (backward view) is done accordingly to the formulation provided in the \textit{Pack} 8 of the slides. 
+\noindent For the second part of the task, the implementation of the update of the Q function (backward view) is done accordingly to the formulation provided in the \textit{Pack} 8 of the slides. In this case the Q function is approximated as a liner combination of the states features given some weights. Those weights are the one be updated: 
 \begin{lstlisting}
 def update_transition(s, action, s_prime, reward, done):
     s_feats = feature_encoder.encode(s)
     s_prime_feats = feature_encoder.encode(s_prime)
     # Compute TD-Error
     td_error = reward + gamma*(1-done)*max(Q(s_prime_feats)) - Q(s_feats)[action]
-    # Updtae all elegibility traces
+    # Update all elegibility traces
     traces = self.gamma*self.lambda_*traces
     traces[action] += s_feats
     # Update the weights
@@ -270,7 +270,7 @@ def update_transition(s, action, s_prime, reward, done):
     # Reset elegibility traces when state is terminal
     if done: traces = zeros(self.shape)
 \end{lstlisting}
-In this case the agent learns to always take the best action, which usually means to allow going a bit backward first to gain the necessary momentum to climb.
+At each update the agent learns by taking the best action accordingly to the approximation of Q, this also means allowing to going a bit backward first, in order to gain the necessary momentum to climb.
 \newpage
 
 \begin{thebibliography}{9}
