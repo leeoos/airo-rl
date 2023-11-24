@@ -78,7 +78,7 @@ class TDLambda_LVFA:
 
         # TODO update the weights
         # compute TD-Error
-        td_error = (reward + self.gamma*np.max(self.Q(s_prime_feats)) - self.Q(s_feats)[action])
+        td_error = reward + self.gamma*(1-done)*np.max(self.Q(s_prime_feats)) - self.Q(s_feats)[action]
 
         # Updtae current elegibility traces
         # self.traces[action] = self.gamma*self.lambda_*self.traces[action] + s_feats

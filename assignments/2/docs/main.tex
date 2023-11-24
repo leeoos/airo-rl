@@ -8,6 +8,7 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{hyperref}
+\usepackage{textgreek}
 \hypersetup{
     colorlinks,
     citecolor=black,
@@ -160,8 +161,8 @@ Which simplify in:
 \newpage
 \section{Code Implementation}
 
-\subsection{SARSA-Lambda}
-In this case we have to resolve the \textit{"Taxi-v3"} environment from gymnasium, where the goal is to pick up the passenger from one of the colored squares and drop it off at the hotel. The exercise is divided in two tasks:
+\subsection{SARSA-\textlambda{}}
+In this exercise we have to resolve the \textit{"Taxi-v3"} environment from gymnasium, where the goal is to pick up the passenger from one of the colored squares and drop it off at the hotel. The problem is divided in two tasks:
 \begin{enumerate}
     \item Implementation of the $\epsilon$-greedy policy;
     \item Implementation of SARSA-$\lambda$, which means:
@@ -193,6 +194,19 @@ E = gamma*lambda*E
 In the first line is computed the TD error as: $\delta_t  \:=\: R_{t+1} \:+\: \gamma Q(s_{t+n}, a_{t+1}) \:-\: Q(s_t, a_t)$, then used in the update of the Q table. In the second line we add 1 to the entry of the eligibility trace relative to the current state-action pair, in order to take in account the frequency of the visits for a given state. The last two raws perfoms the actual update of the two tables accordingly to the update rules.
 \newpage
 \subsection{RBF Q-Learning}
-
+The aim of this second practical is to implement a \textit{RBF} encoder as well as the update rule for the Q-Learning algorithm. The goal of the agent (car) is to climb the hill and reach the green flag. To do so the agent need to understand that the best acton is to actually go backward first to gain some momentum. The characteristics of the environment specified on the  \\
+ The implementation tasks are:
+\begin{itemize}
+    \item Code an RBG encoder to extract relevant feature from the states
+    \item Code the backward update rule for Q-Learning with eligibility traces
+\end{itemize}
 \newpage
+
+\begin{thebibliography}{9}
+    \bibitem{texbook}
+    \emph{Reinforcement Learning, second edition: An Introduction} by \textit{Richard S. Sutton}, \textit{Andrew G. Barto}, Chapters 6.1 and 7.1 
+
+\end{thebibliography}
+
+
 \end{document}
