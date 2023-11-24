@@ -17,6 +17,21 @@
     urlcolor=black
 }
 
+\lstdefinestyle{mystyle}{
+    language=Python,
+    basicstyle=\small,
+    % basicstyle=\fontsize{7}{8}\selectfont,
+    keywordstyle=\color{violet},
+    commentstyle=\color{green},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny,
+    numbersep=5pt,
+    showstringspaces=false,
+    breaklines=true,
+    frame=leftline,
+}
+
 \begin{document}
 
 \begin{titlepage}
@@ -131,7 +146,7 @@ change from step to step. In other words we have to show that the following equa
 \vspace{5pt}
 \begin{itemize}
     \item[2.] Substituting $V_t$ with $V$, under the assumpion that it does not change.
-    \item[3.] Recalling that $\delta_t  \:=\: R_{t+1} \:+\: \gamma V(S_{t+1}) \:-\: V(S_t)$.
+    \item[3.] Recalling that $\delta_t  \:=\: R_{t+1} \:+\: \gamma V(S_{t+1}) \:-\: V(S_t)$, we can write the rewards in terms of $\delta$.
     \item[4.] Iterating the process of the previous steps for all the rewards $R_t$.
     \item[5.] Collecting the similar terms into a single summation.
     \item[6.] Splitting the summation in three parts, this will be useful to verify the presence of similar terms with opposite sign.
@@ -163,14 +178,14 @@ Which simplify in:
 
 \subsection{SARSA-\textlambda{}}
 In this exercise we have to resolve the \textit{"Taxi-v3"} environment from gymnasium, where the goal is to pick up the passenger from one of the colored squares and drop it off at the hotel. The problem is divided in two tasks:
-\begin{enumerate}
-    \item Implementation of the $\epsilon$-greedy policy;
-    \item Implementation of SARSA-$\lambda$, which means:
+\begin{itemize}
+    \item[a.] Implementation of the $\epsilon$-greedy policy;
+    \item[b.] Implementation of SARSA-$\lambda$, which means:
     \begin{enumerate}
         \item update of the Q table;
         \item update of the eligibility traces.
     \end{enumerate}
-\end{enumerate}
+\end{itemize}
 \vspace{5pt}
 
 \noindent As for the first task here it is the code that choose an action with $\epsilon$-greedy strategy:
@@ -184,22 +199,60 @@ def epsilon_greedy_action(env, Q, state, epsilon):
 \end{lstlisting}
 \vspace{5pt}
 
+\noindent Here the action is selected according to the result of a random sampling from an uniform probability distribution. If the sample value is lower than a given threshold $\epsilon$ the action will be choose randomly (\textit{exploration}) in the other case we will ches the best action accordingly to the q table (\textit{exploitation}).\\
+
 \noindent Regarding the second point, the pseudocode given at \textit{Slide} 71, \textit{Pack} 7 can be taken as a reference for the implementation of the update mechanism for both the Q table and the eligibility traces. Here it is the code for the update:
 \begin{lstlisting}
-delta = reward + (gamma*Q[next_state,next_action]) - Q[state,action]
-E[state,action] += 1
+delta = reward + (gamma*Q[next_s,next_a]) - Q[s,a]
+E[s,a] += 1
 Q = Q + alpha*delta*E
 E = gamma*lambda*E
 \end{lstlisting}
-In the first line is computed the TD error as: $\delta_t  \:=\: R_{t+1} \:+\: \gamma Q(s_{t+n}, a_{t+1}) \:-\: Q(s_t, a_t)$, then used in the update of the Q table. In the second line we add 1 to the entry of the eligibility trace relative to the current state-action pair, in order to take in account the frequency of the visits for a given state. The last two raws perfoms the actual update of the two tables accordingly to the update rules.
+In the first line is computed the TD error as: 
+\begin{equation}
+    \delta_t  \:=\: R_{t+1} \:+\: \gamma Q(s_{t+n}, a_{t+1}) \:-\: Q(s_t, a_t)
+\end{equation}
+then used it the update of the Q table. In the second line we add 1 to the entry of the eligibility trace relative to the current state-action pair, in order to take in account the frequency of the visits for a given state. The last two raws performs the actual update, in matrix from, of the two tables, accordingly to the update rules.
 \newpage
 \subsection{RBF Q-Learning}
-The aim of this second practical is to implement a \textit{RBF} encoder as well as the update rule for the Q-Learning algorithm. The goal of the agent (car) is to climb the hill and reach the green flag. To do so the agent need to understand that the best acton is to actually go backward first to gain some momentum. The characteristics of the environment specified on the  \\
+The aim of this second practical is to implement a \textit{RBF} encoder as well as the update rule for the Q-Learning algorithm. The goal of the agent (car) is to climb the hill and reach the green flag. To do so the agent need to understand that the best acton is to actually go backward first to gain some momentum. The characteristics of the environment are specified on the gymnasium \href{https://gymnasium.farama.org/environments/classic_control/mountain_car/}{\underline{website}}. The observation is a collection of arrays where the elements correspond to position  along the x-axis and the velocity of the car.
  The implementation tasks are:
 \begin{itemize}
-    \item Code an RBG encoder to extract relevant feature from the states
-    \item Code the backward update rule for Q-Learning with eligibility traces
+    \item[a.] Code an RBG encoder to enhance relevant feature from the states;
+    \item[b.] Code the backward update rule for Q-Learning with eligibility traces.
 \end{itemize}
+
+\noindent For the completion of the first it is useful to take in account the implementation of RBF on provided by sklearn. The two main function of the RBF encoder are the initialization and the actual encode, in  pseudo-code:
+\begin{lstlisting}
+initialization(env):
+    # Set up sklearn scaler function
+    scaler = sklearn.preprocessing.StandardScaler()
+    
+    # Sampling a sequence of states to fit rbf
+    for for num_of_sample:
+        sampled_states = [env.observation_space.sample()]
+
+    scaler.fit(sampled_states) # scale the sampled data
+
+    # Set up of RBF encoder
+    num_of_features = 100
+    self.gamma = 0.9999
+    encoder =  RBFSampler(gamma, num_of_features)
+    encoder.fit(self.scaler.transform(sampled_states))
+    
+
+encode(state):
+    # Use the rbf encoder to return the features
+    scaled_state = scaler.transform(state)
+    features = encoder.transform(scaled_state)
+
+    # Flatten the array to restore the original state dimensionality
+    return features.flatten() 
+\end{lstlisting}
+
+\noindent In the pseudo-code it can be notice how a sequence of random state is sampled from the observation space in order to "fit" the RBF encoder. This method is used to computes the parameters needed for the Radial Basis Function approximation. This involves determining the centers and widths of the RBFs based on the input data. In order to do that those data should be properly scaled, in this case this is achieved by the standard scaling function also provided by sklearn.\\
+
+\noindent For the second part of the task, the implementation of the backward update of the Q table is done accordingly to the formulation provided in the \textit{Pack} 8 of the slides. 
 \newpage
 
 \begin{thebibliography}{9}
