@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 
 def epsilon_greedy_action(env, Q, state, epsilon):
-    # TODO choose the action with epsilon-greedy strategy
+    # DONE: choose the action with epsilon-greedy strategy
     action = env.action_space.sample() if np.random.uniform(0, 1) < epsilon else np.argmax(Q[state, :])
     return action
 

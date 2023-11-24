@@ -130,7 +130,7 @@ change from step to step. In other words we have to show that the following equa
 \vspace{5pt}
 \begin{itemize}
     \item[2.] Substituting $V_t$ with $V$, under the assumpion that it does not change.
-    \item[3.] Recalling that $\delta_t  \:=\: R_{t+1} \:+\: \gamma V(S_{t+n}) \:-\: V(S_t)$.
+    \item[3.] Recalling that $\delta_t  \:=\: R_{t+1} \:+\: \gamma V(S_{t+1}) \:-\: V(S_t)$.
     \item[4.] Iterating the process of the previous steps for all the rewards $R_t$.
     \item[5.] Collecting the similar terms into a single summation.
     \item[6.] Splitting the summation in three parts, this will be useful to verify the presence of similar terms with opposite sign.
@@ -159,10 +159,40 @@ Which simplify in:
 
 \newpage
 \section{Code Implementation}
+
+\subsection{SARSA-Lambda}
+In this case we have to resolve the \textit{"Taxi-v3"} environment from gymnasium, where the goal is to pick up the passenger from one of the colored squares and drop it off at the hotel. The exercise is divided in two tasks:
+\begin{enumerate}
+    \item Implementation of the $\epsilon$-greedy policy;
+    \item Implementation of SARSA-$\lambda$, which means:
+    \begin{enumerate}
+        \item update of the Q table;
+        \item update of the eligibility traces.
+    \end{enumerate}
+\end{enumerate}
+\vspace{5pt}
+
+\noindent As for the first task here it is the code that choose an action with $\epsilon$-greedy strategy:
+\begin{lstlisting}
+def epsilon_greedy_action(env, Q, state, epsilon):
+    if np.random.uniform(0, 1) < epsilon:
+        action = env.action_space.sample()  
+    else:
+        action = np.argmax(Q[state, :])
+    return action
+\end{lstlisting}
+\vspace{5pt}
+
+\noindent Regarding the second point, the pseudocode given at \textit{Slide} 71, \textit{Pack} 7 can be taken as a reference for the implementation of the update mechanism for both the Q table and the eligibility traces. Here it is the code for the update:
+\begin{lstlisting}
+delta = reward + (gamma*Q[next_state,next_action]) - Q[state,action]
+E[state,action] += 1
+Q = Q + alpha*delta*E
+E = gamma*lambda*E
+\end{lstlisting}
+In the first line is computed the TD error as: $\delta_t  \:=\: R_{t+1} \:+\: \gamma Q(s_{t+n}, a_{t+1}) \:-\: Q(s_t, a_t)$, then used in the update of the Q table. In the second line we add 1 to the entry of the eligibility trace relative to the current state-action pair, in order to take in account the frequency of the visits for a given state. The last two raws perfoms the actual update of the two tables accordingly to the update rules.
+
 \subsection{RBF Q-Learning}
 
 \newpage
-
-\subsection{SARSA-Lambda}
-
 \end{document}
