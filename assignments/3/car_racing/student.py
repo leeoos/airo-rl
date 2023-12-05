@@ -10,10 +10,9 @@ import gymnasium as gym
 import numpy as np
 
 from utils.rollout import Rollout
-from utils.cmaupdate import 
 from modules.vae import VAE
 from modules.mdrnn import MDN_RNN
-import cma
+from modules.ccma import CCMA
 
 
 class Policy(nn.Module):
@@ -26,14 +25,15 @@ class Policy(nn.Module):
         self.env = gym.make('CarRacing-v2', continuous=self.continuous, render_mode='human')
         self.env.reset()
 
-        #TODO 
+        # Local variables
         latent_dim = 100
         hidden_dim = 100
+        action_space_dim = 3
        
         # Models
         self.vae = VAE(latent_size=latent_dim)
         self.rnn = MDN_RNN(input_size=latent_dim, output_size=hidden_dim)
-        self.controller = nn.Linear(latent_dim + hidden_dim, 3 )
+        self.c = CCMA(self.env, input_dim=latent_dim+hidden_dim, output_dim=action_space_dim)
 
     def forward(self, x):
         h = self.rnn.initial_state()
@@ -43,7 +43,7 @@ class Policy(nn.Module):
     
     def act(self, state):
         input = self.forward(state)
-        a = self.controller(input)
+        a = self.c(input)
        
         return a
 
