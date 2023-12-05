@@ -5,7 +5,7 @@ from student import Policy
 import gymnasium as gym
 
 def evaluate(env=None, n_episodes=1, render=False):
-    agent = Policy(env)
+    agent = Policy()
     agent.load()
 
     env = gym.make('CarRacing-v2', continuous=agent.continuous)
@@ -29,12 +29,10 @@ def evaluate(env=None, n_episodes=1, render=False):
     print('Mean Reward:', np.mean(rewards))
 
 
-def train(env):
-    agent = Policy(env)
+def train():
+    agent = Policy()
     agent.train()
     agent.save()
-    agent.random_rollout()
-
 
 def main():
     parser = argparse.ArgumentParser(description='Run training and evaluation')
