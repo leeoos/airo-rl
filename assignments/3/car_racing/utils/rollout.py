@@ -1,11 +1,16 @@
 import gymnasium as gym
 import torch
+import torchvision.transforms as transforms
 
 class Rollout():
 
     def __init__(self, env) -> None:
         self.env = env 
         self.env.reset()
+        self.transform = transforms.Compose([
+            # transforms.ToTensor(),  # Convert the image to a PyTorch tensor
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
 
     def random_rollout(self, num_rollout=1):
         rollout_obs = []
@@ -18,7 +23,8 @@ class Rollout():
 
             if done: break
 
-            observation = torch.from_numpy(observation).float()
+            # observation = self.transform(torch.from_numpy(observation).float().permute(2,1,0))
+            observation = torch.from_numpy(observation).float() / 255
             rollout_obs.append(observation)
 
             action = torch.from_numpy(action).float()

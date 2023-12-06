@@ -18,6 +18,7 @@ class VAE(nn.Module):
         self.enc_conv1 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, stride=2, padding=1)
         self.enc_conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=2, padding=1)
         self.enc_conv3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1)
+        self.batch_norm = nn.BatchNorm2d(64)
         self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
         
         # z
@@ -44,10 +45,8 @@ class VAE(nn.Module):
         out = F.relu(self.enc_conv1(x))
         out = F.relu(self.enc_conv2(out))
         out = F.relu(self.enc_conv3(out))
+        # out = self.batch_norm(out)
         out = F.relu(self.adaptive_pool(out))
-
-        # print(f'SHAPE --> {out.shape}')
-        # out = out.view(batch_size,1024)
         out = out.reshape(batch_size,1024)
         
         mu = self.mu(out)
@@ -58,14 +57,8 @@ class VAE(nn.Module):
     def decode(self, z):
         batch_size = z.shape[0]
         
-        # print(z.shape)
         out = self.fc(z)
         out = out.view(-1, 256, 6, 6)
-        # out = out.view(-1, 64, 4, 4)  # Reshape to 4x4x64 tensor
-
-        # out = z.view(batch_size, self.latent_size, 1, 1)
-        # print(out.shape)
-
         out = F.relu(self.dec_conv1(out))
         out = F.relu(self.dec_conv2(out))
         out = torch.sigmoid(self.dec_conv3(out))
@@ -80,47 +73,23 @@ class VAE(nn.Module):
         z = mu + eps*sigma
         return z
     
-    def obs_to_z(self, x):
-        mu, logvar = self.encode(x)
-        z = self.latent(mu, logvar)
-        return z
-
-    def sample(self, z):
-        out = self.decode(z)
-        return out
-
-    def get_latent_size(self):
-        return self.latent_size
 
     def set_device(self, device):
         self.device = device
 
-    def loss_function(self, out, y, mu, logvar):
-        #BCE = F.binary_cross_entropy(out, y, reduction="sum")
+    def loss_function(self, out, y, mu, logvar, lambda_=1):
+        CE = F.cross_entropy(out, y)
         KL = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
-        return KL
+        return lambda_*KL + CE
+   
+    # def obs_to_z(self, x):
+    #     mu, logvar = self.encode(x)
+    #     z = self.latent(mu, logvar)
+    #     return z
 
-    def train(network, optimizer, data, batch_size,  num_epochs):
+    # def sample(self, z):
+    #     out = self.decode(z)
+    #     return out
 
-        for epoch in range(num_epochs):
-            for i in range(0, len(data), batch_size):
-                # Get batch
-                X_batch = torch.tensor(data[i:i+batch_size], dtype=torch.float)
-                y_batch = torch.tensor(data[i:i+batch_size], dtype=torch.float)
-
-                # print(f'SHAPE --> {X_batch.shape}')
-
-                # Forward pass
-                outputs, mu, logvar = network.forward(X_batch)
-                loss = network.loss_function(outputs, y_batch, mu, logvar)
-
-                # Backward pass and optimization
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-
-            # Print the loss every 100 epochs
-            if (epoch + 1) % 10 == 0:
-                print(f'RNN: Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
-
-        return
+    # def get_latent_size(self):
+    #     return self.latent_size

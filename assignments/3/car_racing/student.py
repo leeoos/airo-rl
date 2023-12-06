@@ -12,7 +12,7 @@ import numpy as np
 from utils.rollout import Rollout
 from modules.vae import VAE
 from modules.mdrnn import MDN_RNN
-from modules.ccma import CCMA
+import cma
 
 
 class Policy(nn.Module):
@@ -33,7 +33,7 @@ class Policy(nn.Module):
         # Models
         self.vae = VAE(latent_size=latent_dim)
         self.rnn = MDN_RNN(input_size=latent_dim, output_size=hidden_dim)
-        self.c = CCMA(self.env, input_dim=latent_dim+hidden_dim, output_dim=action_space_dim)
+        self.c = self.c = nn.Linear(latent_dim+hidden_dim, action_space_dim)
 
     def forward(self, x):
         h = self.rnn.initial_state()
@@ -50,10 +50,11 @@ class Policy(nn.Module):
     def train(self):
 
         # Train the Variational Autoencoder
-        rollout_obs, rollout_actions = Rollout(self.env).random_rollout(num_rollout=1)
-        self.train_module(
+        rollout_obs, rollout_actions = Rollout(self.env).random_rollout(num_rollout=32)
+        self.train_nn(
             network=self.vae, 
-            optimizer=torch.optim.Adam(self.vae.parameters(), lr=0.01), 
+            loss_fn=self.vae.loss_function,
+            optimizer=torch.optim.Adam(self.vae.parameters(), lr=0.001), 
             data=rollout_obs, 
             batch_size=32, 
             num_epochs=100
@@ -62,24 +63,24 @@ class Policy(nn.Module):
         # Train the MDN RNN
         mu, logvar = self.vae.encode(rollout_obs)
         rollout_latent = self.vae.latent(mu, logvar)
-
         rollout_mix = torch.cat((rollout_actions, rollout_latent), dim=1)
-        self.train_module(
+
+        self.train_nn(
             network=self.rnn, 
-            optimizer=torch.optim.Adam(self.rnn.parameters(), lr=0.01), 
+            loss_fn=self.rnn.loss_function,
+            optimizer=torch.optim.Adam(self.rnn.parameters(), lr=0.001), 
             data=rollout_mix, 
             batch_size=32, 
             num_epochs=100
         )
 
-        # Train the controller
-
-
     def save(self):
-        torch.save(self.state_dict(), 'model.pt')
+        ...
+        # torch.save(self.state_dict(), 'model.pt')
 
-    def load(self):
-        self.load_state_dict(torch.load('model.pt', map_location=self.device))
+    def load(self): 
+        ...
+        # self.load_state_dict(torch.load('model.pt', map_location=self.device))
 
     def to(self, device):
         ret = super().to(device)
@@ -87,7 +88,7 @@ class Policy(nn.Module):
 
         return ret
 
-    def train_module(self, network, optimizer, data, batch_size,  num_epochs):
+    def train_nn(self, network, loss_fn, optimizer, data, batch_size, num_epochs):
     
         for epoch in range(num_epochs):
             for i in range(0, len(data), batch_size):
@@ -97,19 +98,24 @@ class Policy(nn.Module):
                 y_batch = data[i:i+batch_size]
 
                 # Forward pass
+                loss = 0
                 if network.name == 'VAE': 
                     outputs, mu, sigma = network.forward(X_batch)
+                    loss = loss_fn(outputs, y_batch, mu, sigma)
 
-                elif network.name == 'MDN_RNN':
-                    pi, sigma, mu, outputs = network.forward(X_batch.detach())
-
-                # Loss function
-                loss = network.loss_function(outputs, y_batch, mu, sigma)
+                # elif network.name == 'MDN_RNN':
+                else:
+                    outputs, mu, sigma = network.forward(X_batch.detach())
+                    loss = loss_fn(outputs, y_batch, mu, sigma)
                 
+                # print(f'a{epoch, i}')
                 # Backward pass and optimization
                 optimizer.zero_grad()
                 loss.backward()
+                # nn.utils.clip_grad_norm_(network.parameters(), max_norm=1.0)
+                # print(optimizer.state_dict)
                 optimizer.step()
+                # print(f'b{epoch, i}')
 
             # Print the loss every 100 epochs
             if (epoch + 1) % 10 == 0:
