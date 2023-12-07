@@ -23,6 +23,10 @@ def evaluate(env=None, n_episodes=1, render=False):
             s, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
             total_reward += reward
+
+            ### REMOVE THIS !!! ###
+            print("\tTotal Reward ep {}: {}".format(episode, total_reward))
+            ###
         
         rewards.append(total_reward)
         

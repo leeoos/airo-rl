@@ -23,7 +23,6 @@ class MDN(nn.Module):
         out = self.l1(x)
         pi, sigma, mu  = torch.split(out, (self.K * self.output_size , self.K * self.output_size, self.K * self.output_size), dim=2)
         
-         
         sigma = sigma.view(batch_size, seq_len, self.K, self.output_size)
         sigma = torch.exp(sigma)
         
@@ -31,16 +30,17 @@ class MDN(nn.Module):
 
         pi = pi.view(batch_size, seq_len, self.K, self.output_size)
         pi = F.softmax(pi, dim=2)
-        
         return pi, sigma, mu
     
     def gaussian_distribution(self, y, mu, sigma):
+        y = y.unsqueeze(0)
+        # y = y.permute(0,2,1).permute(1,0,2)
+        # print(y.shape)
         y = y.unsqueeze(2).expand_as(sigma)
         
         out = (y - mu) / sigma
         out = -0.5 * (out * out)
         out = (torch.exp(out) / sigma) * self.oneDivSqrtTwoPI
-
         return out
     
     def loss(self, y, pi, mu, sigma):
@@ -54,5 +54,4 @@ class MDN(nn.Module):
         
         out = -torch.log(out)
         out = torch.mean(out)
-        
         return out

@@ -10,9 +10,11 @@ class VAE(nn.Module):
     def __init__(self, latent_size):
         super().__init__()
 
+        # global variables
         self.name = 'VAE'
         self.latent_size = latent_size
         self.device = None
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         # encoder
         self.enc_conv1 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, stride=2, padding=1)
@@ -31,17 +33,17 @@ class VAE(nn.Module):
         self.dec_conv2 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1)
         self.dec_conv3 = nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1)
         self.dec_conv4 = nn.ConvTranspose2d(32, 3, kernel_size=3, stride=2, padding=1, output_padding=1)
-
         
     def forward(self, x):
         mu, logvar = self.encode(x)
         z = self.latent(mu, logvar)
         out = self.decode(z)
-        return out, mu, logvar
+        return out, mu, logvar, None, None
         
     def encode(self, x):
         batch_size = x.shape[0]
-        
+
+        # Forward
         out = F.relu(self.enc_conv1(x))
         out = F.relu(self.enc_conv2(out))
         out = F.relu(self.enc_conv3(out))
@@ -51,21 +53,19 @@ class VAE(nn.Module):
         
         mu = self.mu(out)
         logvar = self.logvar(out)
-        
         return mu, logvar
         
     def decode(self, z):
         batch_size = z.shape[0]
         
+        # Forward
         out = self.fc(z)
         out = out.view(-1, 256, 6, 6)
         out = F.relu(self.dec_conv1(out))
         out = F.relu(self.dec_conv2(out))
         out = torch.sigmoid(self.dec_conv3(out))
         out = torch.sigmoid(self.dec_conv4(out))
-        
         return out
-        
         
     def latent(self, mu, logvar):
         sigma = torch.exp(0.5*logvar)
@@ -73,23 +73,16 @@ class VAE(nn.Module):
         z = mu + eps*sigma
         return z
     
-
     def set_device(self, device):
         self.device = device
 
-    def loss_function(self, out, y, mu, logvar, lambda_=1):
+    def loss(self, out, y, mu, logvar, sigma, pi):
         CE = F.cross_entropy(out, y)
         KL = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
-        return lambda_*KL + CE
-   
-    # def obs_to_z(self, x):
-    #     mu, logvar = self.encode(x)
-    #     z = self.latent(mu, logvar)
-    #     return z
+        return KL + CE
+    
+    def save(self):
+        torch.save(self.state_dict(), './models/'+self.name.lower()+'.pt')
 
-    # def sample(self, z):
-    #     out = self.decode(z)
-    #     return out
-
-    # def get_latent_size(self):
-    #     return self.latent_size
+    def load(self): 
+        self.load_state_dict(torch.load('./models/'+self.name.lower()+'.pt', map_location=self.device))
