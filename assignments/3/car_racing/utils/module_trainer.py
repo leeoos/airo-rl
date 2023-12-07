@@ -29,11 +29,13 @@ class Trainer():
 
         return model
     
-    def train(self, model_, data_, batch_size_=32, epochs_=100, lr_=0.001):
+    def train(self, model_, data_, batch_size_=32, epochs_=100, lr_=0.001, retrain=False):
+
+        if retrain: os.remove('./models/'+model_.name.lower()+'.pt')
         trained_model = copy.deepcopy(model_)
         
         if os.path.exists('./models/'+model_.name.lower()+'.pt'):
-            print("Loading model "+model_.name.lower()+" state parameters")
+            print("Loading model "+model_.name+" state parameters")
             trained_model.load()
 
         else:
@@ -50,21 +52,5 @@ class Trainer():
 
         return trained_model
     
-    # def train_rnn(self, model_, data_, batch_size_=32, epochs_=100, lr_=0.001):
-    #     trained_model = copy.deepcopy(model_)
-        
-    #     if os.path.exists('./save/rnn.pt'):
-    #         trained_model.load()
-
-    #     else:
-    #         trained_model = self.train_module(
-    #             model=model_, 
-    #             loss_fn=model_.loss,
-    #             optimizer=torch.optim.Adam(model_.parameters(), lr=lr_), 
-    #             data=data_, 
-    #             batch_size=batch_size_, 
-    #             num_epochs=epochs_
-    #         )
-    #         trained_model.save()
-    #     return trained_model
+    
         
