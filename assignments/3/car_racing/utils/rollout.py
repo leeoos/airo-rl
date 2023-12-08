@@ -41,11 +41,11 @@ class Rollout():
             idx += e_p.numel()
         return unflattened
 
-    def rollout(self, env, agent, controller, params=None, limit=100000):
+    def rollout(self, env, agent, controller, params=None, limit=100000, device='cpu'):
         """ Execute a rollout and returns minus cumulative reward. """
 
         if params is not None:
-            params = self.unflatten_parameters(params, self.C.parameters(), self.device)
+            params = self.unflatten_parameters(params, controller.parameters(), device)
 
             # load parameters into controller
             for p, p_0 in zip(controller.parameters(), params):

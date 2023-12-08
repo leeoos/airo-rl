@@ -23,7 +23,7 @@ class Policy(nn.Module):
         super(Policy, self).__init__()
 
         # gym env
-        self.env = gym.make('CarRacing-v2', continuous=self.continuous, render_mode='robot')
+        self.env = gym.make('CarRacing-v2', continuous=self.continuous, render_mode='rgb_array')
         self.env.reset()
 
         # nn variables
@@ -89,6 +89,8 @@ class Policy(nn.Module):
     def train(self):
         """Train the entire network or just the controller module"""
 
+        _retrain = False # set to True to retarin vae and rnn
+
         # random rollout to collect observations
         rollout_obs, rollout_actions = self.roller.random_rollout(self.env, self.num_rollout)
         rollout_obs.to(self.device)
@@ -99,7 +101,7 @@ class Policy(nn.Module):
             model_ =self.vae, 
             data_=rollout_obs, 
             batch_size_=self.batch_size,
-            retrain=True
+            retrain=_retrain
         )
 
         # encode the observation to train the rnn
@@ -114,17 +116,17 @@ class Policy(nn.Module):
             model_ =self.rnn, 
             data_=rollout_al.detach(), 
             batch_size_=self.batch_size,
-            retrain=True
+            retrain=_retrain
         )
 
-        print(self.roller.rollout(env=self.env, agent=self, controller=self.c))
+        # print(self.roller.rollout(env=self.env, agent=self, controller=self.c))
 
         # train the controller
-        # pop_size = 4
-        # target_return= 950
-        # params = self.C.parameters()
-        # flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
-        # print('test ', Rollout(self.env).rollout(self, self.c, params=flat_params))
+        pop_size = 4
+        target_return= 950
+        params = self.c.parameters()
+        flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
+        print('test ', self.roller.rollout(self.env, self, self.c, params=flat_params))
         # es = cma.CMAEvolutionStrategy(flat_params, 0.1, {'popsize': pop_size})
         '''
         cur_best = None
