@@ -29,7 +29,7 @@ class Policy(nn.Module):
         super(Policy, self).__init__()
 
         # gym env
-        self.env = gym.make('CarRacing-v2', continuous=self.continuous, render_mode='human')
+        self.env = gym.make('CarRacing-v2', continuous=self.continuous, render_mode='rgb_array')
 
         # nn variables
         self.latent_dim = 100
@@ -39,7 +39,7 @@ class Policy(nn.Module):
         # global variables
         self.device = device
         self.batch_size = 32
-        self.num_rollout = 32*100
+        self.num_rollout = 32*10
         self.starting_state = True
         self.memory = None # rnn state is empy at the beginning
        
@@ -94,23 +94,40 @@ class Policy(nn.Module):
     def train(self):
         """Train the entire network or just the controller module"""
 
-        train_nn_modules = True # set to True to retarin vae and rnn
+        # rollout_obs, rollout_actions = self.roller.random_rollout(self.env, self.num_rollout)
+        # print(rollout_obs.shape)
 
-        if train_nn_modules:
+        # set to True to retarin vae and rnn
+        train_vae = False
+        train_rnn = False
 
+        rollout_obs, rollout_actions = 0, 0
+
+        if train_vae:
             # random rollout to collect observations
             rollout_obs, rollout_actions = self.roller.random_rollout(self.env, self.num_rollout)
-            # print(rollout_obs.shape)
             rollout_obs.to(self.device)
             rollout_actions.detach().to(self.device)
 
+
             # train the vae
             self.vae = self.trainer.train(
-                model_ =self.vae, 
+                model_=self.vae, 
                 data_=rollout_obs, 
                 batch_size_=self.batch_size,
-                epochs_=200
+                epochs_=150
             )
+            
+        else:
+            self.vae = self.trainer.load_model(self.vae)
+
+        if train_rnn:
+            if not train_vae:
+                # random rollout to collect observations
+                rollout_obs, rollout_actions = self.roller.random_rollout(self.env, self.num_rollout)
+                rollout_obs.to(self.device)
+                rollout_actions.detach().to(self.device)
+                self.vae = self.trainer.load_model(self.vae)
 
             # encode the observation to train the rnn
             mu, logvar = self.vae.encode(rollout_obs)
@@ -127,15 +144,17 @@ class Policy(nn.Module):
                 epochs_=50
             )
 
+        else:
+            self.rnn = self.trainer.load_model(self.rnn)
+
         # print(self.roller.rollout(env=self.env, agent=self, controller=self.c))
 
         ##########################################################################
-        train_controller = False # set to True to retarin controller
+        train_controller = True # set to True to retarin controller
 
         if train_controller:
             pop_size = 4
-            n_samples = 1 # single
-            target_return= 950
+            n_samples = 1 # 1 for signle thread
 
             params = self.c.parameters()
             flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
@@ -147,6 +166,7 @@ class Policy(nn.Module):
             r_queue = Queue()
             e_queue = Queue()
             c_queue = Queue()
+            cp_queue = Queue()
 
             epoch = 0
             log_step = 3
@@ -156,6 +176,7 @@ class Policy(nn.Module):
 
             print("Starting CMA training")
             while not es.stop():
+
                 if cur_best is not None and - cur_best > target_return:
                     print("Already better than target, breaking...")
                     break
@@ -178,6 +199,7 @@ class Policy(nn.Module):
 
                 for _ in range(pop_size * n_samples):
                     s_id, params = p_queue.get()
+                    cp_queue.put((s_id, params))
                     r_queue.put((
                             s_id, 
                             self.roller.rollout(self.env, self, self.c, params, display=True)
@@ -190,7 +212,8 @@ class Policy(nn.Module):
                 for _ in range(pop_size * n_samples):
 
                     r_s_id, r = r_queue.get(p_queue.qsize())
-                    r_list[r_s_id] += r / n_samples
+                    # r_list[r_s_id] += r / n_samples
+                    r_list[_] += r / n_samples
                     c_queue.put((r_s_id, r))
 
                     if display:
@@ -207,8 +230,7 @@ class Policy(nn.Module):
                 if epoch % log_step == log_step - 1:
 
                     print("copy of r_queue: ", c_queue.qsize())
-                    best_params, best, std_best = self.roller.evaluate(solutions, r_list, r_queue=c_queue)
-                    # best_params, best, std_best = self.roller.evaluate(solutions, r_list, r_queue=r_queue)
+                    best_params, best, std_best = self.roller.evaluate(solutions, r_list, p_queue=cp_queue, r_queue=c_queue)
                     print("Current evaluation: {}".format(best))
 
                     if not cur_best or cur_best > best:
@@ -222,10 +244,8 @@ class Policy(nn.Module):
                     if - best > target_return:
                         print("Terminating controller training with value {}...".format(best))
                         break
-
                 epoch += 1
 
-                # break
         return
         ##########################################################################
 

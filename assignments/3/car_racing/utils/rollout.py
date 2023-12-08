@@ -77,24 +77,30 @@ class Rollout():
         return - cumulative
         # i += 1
 
-    def evaluate(self, solutions, results, p_queue=None, r_queue=None, rollouts=100):
+    def evaluate(self, solutions, results, p_queue, r_queue, test_best=100):
         """ Give current controller evaluation, returns: minus averaged cumulated reward """
 
         index_min = np.argmin(results)
         best_guess = solutions[index_min]
         restimates = []
 
-        # for s_id in range(rollouts):
-        #     p_queue.put((s_id, best_guess))
+        for s_id in range(test_best):
+            p_queue.put((s_id, best_guess))
 
         print("Evaluating...")
-        print("r_queue: ", r_queue.qsize())
-        # for _ in tqdm(range(rollouts)):
-        for _ in tqdm(results):
-            # while self.r_queue.empty():
-            #     sleep(.1)
-            restimates.append(r_queue.get()[1])
-            # restimates.append(results)
+        # print("r_queue: ", r_queue.qsize())
+        
+        for _ in range(test_best):
+            s_id, params = p_queue.get()
+            value = self.roller.rollout(self.env, self, self.c, params, display=True)
+            restimates.append(value)
+        
+
+        # for _ in tqdm(test_best):
+        #     # while self.r_queue.empty():
+        #     #     sleep(.1)
+        #     restimates.append(r_queue.get()[1])
+        #     # restimates.append(results)
 
         return best_guess, np.mean(restimates), np.std(restimates)
     
