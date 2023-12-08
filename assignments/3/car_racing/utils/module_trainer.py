@@ -29,9 +29,9 @@ class Trainer():
 
         return model
     
-    def train(self, model_, data_, batch_size_=32, epochs_=100, lr_=0.001, retrain=False):
+    def train(self, model_, data_, batch_size_=32, epochs_=100, lr_=0.001, retrain_=False):
 
-        if retrain: os.remove('./models/'+model_.name.lower()+'.pt')
+        if retrain_: os.remove('./models/'+model_.name.lower()+'.pt')
         trained_model = copy.deepcopy(model_)
         
         if os.path.exists('./models/'+model_.name.lower()+'.pt'):

@@ -4,17 +4,23 @@ import torch.nn.functional as F
 import torch.distributions as D
 from torch import Tensor, List
 from torch.utils.data import Dataset
+# from torch.multiprocessing import Process, Queue
 from torch.distributions.normal import Normal
 
+from queue import Queue
+from tqdm import tqdm
+from time import sleep
+from copy import copy
 import gymnasium as gym
+import matplotlib as plt
 import numpy as np
 import os 
+import cma
 
 from utils.rollout import Rollout
 from utils.module_trainer import Trainer
 from modules.vae import VAE
 from modules.mdn_rnn import MDN_RNN
-import cma
 
 class Policy(nn.Module):
     continuous = True # you can change this
@@ -23,8 +29,7 @@ class Policy(nn.Module):
         super(Policy, self).__init__()
 
         # gym env
-        self.env = gym.make('CarRacing-v2', continuous=self.continuous, render_mode='rgb_array')
-        self.env.reset()
+        self.env = gym.make('CarRacing-v2', continuous=self.continuous, render_mode='human')
 
         # nn variables
         self.latent_dim = 100
@@ -34,7 +39,7 @@ class Policy(nn.Module):
         # global variables
         self.device = device
         self.batch_size = 32
-        self.num_rollout = 1
+        self.num_rollout = 32*100
         self.starting_state = True
         self.memory = None # rnn state is empy at the beginning
        
@@ -89,85 +94,99 @@ class Policy(nn.Module):
     def train(self):
         """Train the entire network or just the controller module"""
 
-        _retrain = False # set to True to retarin vae and rnn
+        retrain = False # set to True to retarin vae and rnn
 
         # random rollout to collect observations
-        rollout_obs, rollout_actions = self.roller.random_rollout(self.env, self.num_rollout)
-        rollout_obs.to(self.device)
-        rollout_actions.detach().to(self.device)
+        if retrain:
+            rollout_obs, rollout_actions = self.roller.random_rollout(self.env, self.num_rollout)
+            # print(rollout_obs.shape)
+            rollout_obs.to(self.device)
+            rollout_actions.detach().to(self.device)
 
-        # train the vae
-        self.vae = self.trainer.train(
-            model_ =self.vae, 
-            data_=rollout_obs, 
-            batch_size_=self.batch_size,
-            retrain=_retrain
-        )
+            # train the vae
+            self.vae = self.trainer.train(
+                model_ =self.vae, 
+                data_=rollout_obs, 
+                batch_size_=self.batch_size
+            )
 
-        # encode the observation to train the rnn
-        mu, logvar = self.vae.encode(rollout_obs)
-        rollout_latent = self.vae.latent(mu, logvar).to(self.device)
-        rollout_al = torch.cat((rollout_actions, rollout_latent), dim=1).to(self.device)
+            # encode the observation to train the rnn
+            mu, logvar = self.vae.encode(rollout_obs)
+            rollout_latent = self.vae.latent(mu, logvar).to(self.device)
+            rollout_al = torch.cat((rollout_actions, rollout_latent), dim=1).to(self.device)
 
-        # print(self.rnn.forward_lstm(rollout_al)[0].shape)
+            # print(self.rnn.forward_lstm(rollout_al)[0].shape)
 
-        # train the rnn
-        self.rnn = self.trainer.train(
-            model_ =self.rnn, 
-            data_=rollout_al.detach(), 
-            batch_size_=self.batch_size,
-            retrain=_retrain
-        )
+            # train the rnn
+            self.rnn = self.trainer.train(
+                model_ =self.rnn, 
+                data_=rollout_al.detach(), 
+                batch_size_=self.batch_size
+            )
 
         # print(self.roller.rollout(env=self.env, agent=self, controller=self.c))
 
+        ##########################################################################
         # train the controller
         pop_size = 4
+        n_samples = 1 # single
         target_return= 950
+
         params = self.c.parameters()
         flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
-        print('test ', self.roller.rollout(self.env, self, self.c, params=flat_params))
-        # es = cma.CMAEvolutionStrategy(flat_params, 0.1, {'popsize': pop_size})
-        '''
-        cur_best = None
+
+        #print('test ', self.roller.rollout(self.env, self, self.c, params=flat_params))
+        es = cma.CMAEvolutionStrategy(flat_params, 0.1, {'popsize':pop_size})
+
+        p_queue = Queue()
+        r_queue = Queue()
+        e_queue = Queue()
+        c_queue = Queue()
+
         epoch = 0
         log_step = 3
-        n_samples = 4
         display = True
+        cur_best = None
+        target_return = 50 #950
+
+        print("Starting CMA training")
         while not es.stop():
-            
             if cur_best is not None and - cur_best > target_return:
                 print("Already better than target, breaking...")
                 break
 
-
             r_list = [0] * pop_size  # result list
-            
-
             solutions = es.ask()
 
+            # print('r_list len: ', len(r_list))
+            # print('solution len: ', len(solutions))
+            # print('solution shape: ', solutions[0].shape)
+            # print('parameters shape:', flat_params.shape)
 
             # push parameters to queue
             for s_id, s in enumerate(solutions):
                 for _ in range(n_samples):
-                    self.p_queue.put((s_id, s))
+                    p_queue.put((s_id, s))
+            
+            # print('queue: ', p_queue.qsize())
+            # print('range: ', pop_size*n_samples)
 
-            for _ in range(self.p_queue.qsize()):
-                s_id, params = self.p_queue.get()
-                self.r_queue.put((s_id, self.objective_function(params)))
-                
-          
+            for _ in range(pop_size * n_samples):
+                s_id, params = p_queue.get()
+                r_queue.put((
+                        s_id, 
+                        self.roller.rollout(self.env, self, self.c, params, display=True)
+                    ))
 
             # retrieve results
             if display:
                 pbar = tqdm(total=pop_size * n_samples)
 
             for _ in range(pop_size * n_samples):
-                while self.r_queue.empty():
-                    sleep(.1)
 
-                r_s_id, r = self.r_queue.get()
+                r_s_id, r = r_queue.get(p_queue.qsize())
                 r_list[r_s_id] += r / n_samples
+                c_queue.put((r_s_id, r))
 
                 if display:
                     pbar.update(1)
@@ -175,40 +194,35 @@ class Policy(nn.Module):
             if display:
                 pbar.close()
 
+            # print('queue: ', p_queue.qsize())
             es.tell(solutions, r_list)
             es.disp()
 
-
             # evaluation and saving
             if epoch % log_step == log_step - 1:
-                best_params, best, std_best = self.evaluate(solutions, r_list, self.p_queue, self.r_queue)
+
+                print("copy of r_queue: ", c_queue.qsize())
+                best_params, best, std_best = self.roller.evaluate(solutions, r_list, r_queue=c_queue)
+                # best_params, best, std_best = self.roller.evaluate(solutions, r_list, r_queue=r_queue)
                 print("Current evaluation: {}".format(best))
 
                 if not cur_best or cur_best > best:
                     cur_best = best
                     print("Saving new best with value {}+-{}...".format(-cur_best, std_best))
-                    
-                    # load_parameters(best_params, controller)
-
-                    # Load parameters
-                    for p, p_0 in zip(self.C.parameters(), params):
+        
+                    # load parameters into controller
+                    for p, p_0 in zip(self.c.parameters(), params):
                         p.data.copy_(p_0)
-                    controller = self.C
-                    # torch.save(
-                    #     {'epoch': epoch,
-                    #     'reward': - cur_best,
-                    #     'state_dict': controller.state_dict()},
-                    #     join(ctrl_dir, 'best.tar'))
+
                 if - best > target_return:
                     print("Terminating controller training with value {}...".format(best))
                     break
 
-
             epoch += 1
 
-        # es.result_pretty()
-        self.e_queue.put('EOP')
-        '''
+            # break
+        return
+        ##########################################################################
 
     def save(self):
         torch.save(self.state_dict(), 'model.pt')

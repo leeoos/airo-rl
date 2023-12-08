@@ -1,14 +1,20 @@
-import gymnasium as gym
 import torch
-import torchvision.transforms as transforms
+# import torchvision.transforms as transforms
+
+import gymnasium as gym
+import numpy as np
+from tqdm import tqdm
+from time import sleep
 
 class Rollout():
 
     def __init__(self):
         pass
 
-    def random_rollout(self, env,num_rollout=1):
+    def random_rollout(self, env, num_rollout=1):
         """ Execute a random rollout and returns actions and observations """
+
+        env.reset()
 
         rollout_obs = []
         rollout_actions = []
@@ -16,7 +22,7 @@ class Rollout():
         for _ in range(num_rollout):
             action = env.action_space.sample()
             observation, reward, terminated, truncated, info = env.step(action)
-            done = terminated or truncated
+            done = terminated #or truncated
             if done: break
 
             observation = torch.from_numpy(observation).float() / 255
@@ -31,7 +37,7 @@ class Rollout():
         return rollout_obs, rollout_actions
     
     def unflatten_parameters(self, params, example, device):
-        """ Unflatten parameters. NOte: example is generator of parameters (as returned by module.parameters()), used to reshape params """
+        """ Unflatten parameters. Note: example is generator of parameters (module.parameters()), used to reshape params """
 
         params = torch.Tensor(params).to(device)
         idx = 0
@@ -41,7 +47,7 @@ class Rollout():
             idx += e_p.numel()
         return unflattened
 
-    def rollout(self, env, agent, controller, params=None, limit=100000, device='cpu'):
+    def rollout(self, env, agent, controller, params=None, limit=2000, device='cpu', display=False):
         """ Execute a rollout and returns minus cumulative reward. """
 
         if params is not None:
@@ -53,17 +59,43 @@ class Rollout():
 
         obs, _ = env.reset()
         cumulative = 0
-        i = 0
+        step_counter = 0 
+        done = False
 
-        while True:
+        while not done:
             obs= torch.tensor(obs/255, dtype=torch.float).unsqueeze(0).permute(0,1,3,2).permute(0,2,1,3)
             action = agent.act(obs)
             obs, reward, terminated, truncated, _ = env.step(action)
-            done = terminated or truncated
+            done = terminated or (step_counter > limit)
 
             cumulative += reward
-            if done or i >= limit: return - cumulative
-            i += 1
+            step_counter +=1
+            # if done or i >= limit: 
 
+        if display: print(f"Total Reward: {cumulative}")
+        agent.starting_state = True
+        return - cumulative
+        # i += 1
+
+    def evaluate(self, solutions, results, p_queue=None, r_queue=None, rollouts=100):
+        """ Give current controller evaluation, returns: minus averaged cumulated reward """
+
+        index_min = np.argmin(results)
+        best_guess = solutions[index_min]
+        restimates = []
+
+        # for s_id in range(rollouts):
+        #     p_queue.put((s_id, best_guess))
+
+        print("Evaluating...")
+        print("r_queue: ", r_queue.qsize())
+        # for _ in tqdm(range(rollouts)):
+        for _ in tqdm(results):
+            # while self.r_queue.empty():
+            #     sleep(.1)
+            restimates.append(r_queue.get()[1])
+            # restimates.append(results)
+
+        return best_guess, np.mean(restimates), np.std(restimates)
     
     
