@@ -10,7 +10,6 @@ from torch.distributions.normal import Normal
 from queue import Queue
 from tqdm import tqdm
 from time import sleep
-from copy import copy
 import gymnasium as gym
 import matplotlib as plt
 import numpy as np
@@ -77,6 +76,9 @@ class Policy(nn.Module):
         return c_in, z, h
     
     def act(self, state):
+        # convert input state as a torch tensor
+        state = torch.tensor(state/255, dtype=torch.float).unsqueeze(0).permute(0,1,3,2).permute(0,2,1,3)
+
         c_in, z, h = self.forward(state)
         a = self.c(c_in).to(self.device)
         # print("action: ", a.shape)
@@ -109,13 +111,13 @@ class Policy(nn.Module):
             rollout_obs.to(self.device)
             rollout_actions.detach().to(self.device)
 
-
             # train the vae
             self.vae = self.trainer.train(
-                model_=self.vae, 
-                data_=rollout_obs, 
-                batch_size_=self.batch_size,
-                epochs_=150
+                model=self.vae, 
+                data=rollout_obs, 
+                batch_size=self.batch_size,
+                epochs=10,
+                device=self.device,
             )
             
         else:
@@ -127,7 +129,7 @@ class Policy(nn.Module):
                 rollout_obs, rollout_actions = self.roller.random_rollout(self.env, self.num_rollout)
                 rollout_obs.to(self.device)
                 rollout_actions.detach().to(self.device)
-                self.vae = self.trainer.load_model(self.vae)
+                # self.vae = self.trainer.load_model(self.vae)
 
             # encode the observation to train the rnn
             mu, logvar = self.vae.encode(rollout_obs)
@@ -138,10 +140,11 @@ class Policy(nn.Module):
 
             # train the rnn
             self.rnn = self.trainer.train(
-                model_ =self.rnn, 
-                data_=rollout_al.detach(), 
-                batch_size_=self.batch_size,
-                epochs_=50
+                model=self.rnn, 
+                data=rollout_al.detach(), 
+                batch_size=self.batch_size,
+                epochs=10,
+                device=self.device
             )
 
         else:
@@ -149,8 +152,15 @@ class Policy(nn.Module):
 
         # print(self.roller.rollout(env=self.env, agent=self, controller=self.c))
 
+        # solutions = [1,2,3,4,5,6]
+        # r_list = [7,8,9,10,11,12]
+        # best_params, best = self.evaluate(solutions, r_list, p_queue=None, r_queue=None)
+        # print(best_params, best)
+
+        # return
+
         ##########################################################################
-        train_controller = True # set to True to retarin controller
+        train_controller = False # set to True to retarin controller
 
         if train_controller:
             pop_size = 4
@@ -168,8 +178,10 @@ class Policy(nn.Module):
             c_queue = Queue()
             cp_queue = Queue()
 
+            p_list = []
+
             epoch = 0
-            log_step = 3
+            log_step = 3 # print each n steps
             display = True
             cur_best = None
             target_return = 50 #950
@@ -191,36 +203,39 @@ class Policy(nn.Module):
 
                 # push parameters to queue
                 for s_id, s in enumerate(solutions):
-                    for _ in range(n_samples):
-                        p_queue.put((s_id, s))
+                    # p_list.append(s)
+                    params = s
+                    r_list[s_id] = self.roller.rollout(self.env, self, self.c, params, display=True)
+                    # for _ in range(n_samples):
+                    #     p_queue.put((s_id, s))
                 
                 # print('queue: ', p_queue.qsize())
                 # print('range: ', pop_size*n_samples)
 
-                for _ in range(pop_size * n_samples):
-                    s_id, params = p_queue.get()
-                    cp_queue.put((s_id, params))
-                    r_queue.put((
-                            s_id, 
-                            self.roller.rollout(self.env, self, self.c, params, display=True)
-                        ))
+                # for _ in range(pop_size * n_samples):
+                    # s_id, params = p_queue.get()
+                    # cp_queue.put((s_id, params))
+                    # r_queue.put((
+                    #         s_id, 
+                    #         self.roller.rollout(self.env, self, self.c, params, display=True)
+                    #     ))
 
                 # retrieve results
-                if display:
-                    pbar = tqdm(total=pop_size * n_samples)
+                # if display:
+                #     pbar = tqdm(total=pop_size * n_samples)
 
-                for _ in range(pop_size * n_samples):
+                # for _ in range(pop_size * n_samples):
 
-                    r_s_id, r = r_queue.get(p_queue.qsize())
-                    # r_list[r_s_id] += r / n_samples
-                    r_list[_] += r / n_samples
-                    c_queue.put((r_s_id, r))
+                #     r_s_id, r = r_queue.get(p_queue.qsize())
+                #     # r_list[r_s_id] += r / n_samples
+                #     r_list[_] += r / n_samples
+                #     c_queue.put((r_s_id, r))
 
-                    if display:
-                        pbar.update(1)
+                #     if display:
+                #         pbar.update(1)
 
-                if display:
-                    pbar.close()
+                # if display:
+                #     pbar.close()
 
                 # print('queue: ', p_queue.qsize())
                 es.tell(solutions, r_list)
@@ -230,11 +245,13 @@ class Policy(nn.Module):
                 if epoch % log_step == log_step - 1:
 
                     print("copy of r_queue: ", c_queue.qsize())
-                    best_params, best, std_best = self.roller.evaluate(solutions, r_list, p_queue=cp_queue, r_queue=c_queue)
+                    best_params, best = self.evaluate(solutions, r_list, p_queue=cp_queue, r_queue=c_queue)
+                    # best_params, best, std_best = self.evaluate(solutions, r_list, p_queue=cp_queue, r_queue=c_queue)
                     print("Current evaluation: {}".format(best))
 
                     if not cur_best or cur_best > best:
                         cur_best = best
+                        std_best = 0 # tmp
                         print("Saving new best with value {}+-{}...".format(-cur_best, std_best))
             
                         # load parameters into controller
@@ -259,3 +276,34 @@ class Policy(nn.Module):
         ret = super().to(device)
         ret.device = device
         return ret
+
+
+    def evaluate(self, solutions, results, p_queue, r_queue, test_best=10):
+        """ Give current controller evaluation, returns: minus averaged cumulated reward """
+
+        # internal_queue = Queue()
+        index_min = np.argmin(results)
+        best_guess = solutions[index_min]
+        restimates = []
+
+        # for s_id in range(test_best):
+        #     p_queue.put((s_id, best_guess))
+
+        print("Evaluating...")
+        # print("r_queue: ", r_queue.qsize())
+
+        value = self.roller.rollout(self.env, self, self.c, best_guess)
+        
+        # for _ in range(test_best):
+        #     s_id, params = p_queue.get()
+        #     value = self.roller.rollout(self.env, self, self.c, params)
+        #     restimates.append(value)
+        
+
+        # for _ in tqdm(test_best):
+        #     # while self.r_queue.empty():
+        #     #     sleep(.1)
+        #     restimates.append(r_queue.get()[1])
+        #     # restimates.append(results)
+
+        return best_guess, value #np.mean(restimates), np.std(restimates)

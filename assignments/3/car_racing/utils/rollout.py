@@ -63,45 +63,16 @@ class Rollout():
         done = False
 
         while not done:
-            obs= torch.tensor(obs/255, dtype=torch.float).unsqueeze(0).permute(0,1,3,2).permute(0,2,1,3)
+            # obs= torch.tensor(obs/255, dtype=torch.float).unsqueeze(0).permute(0,1,3,2).permute(0,2,1,3)
             action = agent.act(obs)
             obs, reward, terminated, truncated, _ = env.step(action)
             done = terminated or (step_counter > limit)
 
             cumulative += reward
             step_counter +=1
-            # if done or i >= limit: 
 
         if display: print(f"Total Reward: {cumulative}")
         agent.starting_state = True
-        return - cumulative
-        # i += 1
-
-    def evaluate(self, solutions, results, p_queue, r_queue, test_best=100):
-        """ Give current controller evaluation, returns: minus averaged cumulated reward """
-
-        index_min = np.argmin(results)
-        best_guess = solutions[index_min]
-        restimates = []
-
-        for s_id in range(test_best):
-            p_queue.put((s_id, best_guess))
-
-        print("Evaluating...")
-        # print("r_queue: ", r_queue.qsize())
-        
-        for _ in range(test_best):
-            s_id, params = p_queue.get()
-            value = self.roller.rollout(self.env, self, self.c, params, display=True)
-            restimates.append(value)
-        
-
-        # for _ in tqdm(test_best):
-        #     # while self.r_queue.empty():
-        #     #     sleep(.1)
-        #     restimates.append(r_queue.get()[1])
-        #     # restimates.append(results)
-
-        return best_guess, np.mean(restimates), np.std(restimates)
+        return (-cumulative)
     
     
