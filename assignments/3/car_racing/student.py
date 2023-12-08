@@ -94,10 +94,11 @@ class Policy(nn.Module):
     def train(self):
         """Train the entire network or just the controller module"""
 
-        retrain = False # set to True to retarin vae and rnn
+        train_nn_modules = True # set to True to retarin vae and rnn
 
-        # random rollout to collect observations
-        if retrain:
+        if train_nn_modules:
+
+            # random rollout to collect observations
             rollout_obs, rollout_actions = self.roller.random_rollout(self.env, self.num_rollout)
             # print(rollout_obs.shape)
             rollout_obs.to(self.device)
@@ -107,7 +108,8 @@ class Policy(nn.Module):
             self.vae = self.trainer.train(
                 model_ =self.vae, 
                 data_=rollout_obs, 
-                batch_size_=self.batch_size
+                batch_size_=self.batch_size,
+                epochs_=200
             )
 
             # encode the observation to train the rnn
@@ -121,106 +123,109 @@ class Policy(nn.Module):
             self.rnn = self.trainer.train(
                 model_ =self.rnn, 
                 data_=rollout_al.detach(), 
-                batch_size_=self.batch_size
+                batch_size_=self.batch_size,
+                epochs_=50
             )
 
         # print(self.roller.rollout(env=self.env, agent=self, controller=self.c))
 
         ##########################################################################
-        # train the controller
-        pop_size = 4
-        n_samples = 1 # single
-        target_return= 950
+        train_controller = False # set to True to retarin controller
 
-        params = self.c.parameters()
-        flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
+        if train_controller:
+            pop_size = 4
+            n_samples = 1 # single
+            target_return= 950
 
-        #print('test ', self.roller.rollout(self.env, self, self.c, params=flat_params))
-        es = cma.CMAEvolutionStrategy(flat_params, 0.1, {'popsize':pop_size})
+            params = self.c.parameters()
+            flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
 
-        p_queue = Queue()
-        r_queue = Queue()
-        e_queue = Queue()
-        c_queue = Queue()
+            #print('test ', self.roller.rollout(self.env, self, self.c, params=flat_params))
+            es = cma.CMAEvolutionStrategy(flat_params, 0.1, {'popsize':pop_size})
 
-        epoch = 0
-        log_step = 3
-        display = True
-        cur_best = None
-        target_return = 50 #950
+            p_queue = Queue()
+            r_queue = Queue()
+            e_queue = Queue()
+            c_queue = Queue()
 
-        print("Starting CMA training")
-        while not es.stop():
-            if cur_best is not None and - cur_best > target_return:
-                print("Already better than target, breaking...")
-                break
+            epoch = 0
+            log_step = 3
+            display = True
+            cur_best = None
+            target_return = 50 #950
 
-            r_list = [0] * pop_size  # result list
-            solutions = es.ask()
-
-            # print('r_list len: ', len(r_list))
-            # print('solution len: ', len(solutions))
-            # print('solution shape: ', solutions[0].shape)
-            # print('parameters shape:', flat_params.shape)
-
-            # push parameters to queue
-            for s_id, s in enumerate(solutions):
-                for _ in range(n_samples):
-                    p_queue.put((s_id, s))
-            
-            # print('queue: ', p_queue.qsize())
-            # print('range: ', pop_size*n_samples)
-
-            for _ in range(pop_size * n_samples):
-                s_id, params = p_queue.get()
-                r_queue.put((
-                        s_id, 
-                        self.roller.rollout(self.env, self, self.c, params, display=True)
-                    ))
-
-            # retrieve results
-            if display:
-                pbar = tqdm(total=pop_size * n_samples)
-
-            for _ in range(pop_size * n_samples):
-
-                r_s_id, r = r_queue.get(p_queue.qsize())
-                r_list[r_s_id] += r / n_samples
-                c_queue.put((r_s_id, r))
-
-                if display:
-                    pbar.update(1)
-
-            if display:
-                pbar.close()
-
-            # print('queue: ', p_queue.qsize())
-            es.tell(solutions, r_list)
-            es.disp()
-
-            # evaluation and saving
-            if epoch % log_step == log_step - 1:
-
-                print("copy of r_queue: ", c_queue.qsize())
-                best_params, best, std_best = self.roller.evaluate(solutions, r_list, r_queue=c_queue)
-                # best_params, best, std_best = self.roller.evaluate(solutions, r_list, r_queue=r_queue)
-                print("Current evaluation: {}".format(best))
-
-                if not cur_best or cur_best > best:
-                    cur_best = best
-                    print("Saving new best with value {}+-{}...".format(-cur_best, std_best))
-        
-                    # load parameters into controller
-                    for p, p_0 in zip(self.c.parameters(), params):
-                        p.data.copy_(p_0)
-
-                if - best > target_return:
-                    print("Terminating controller training with value {}...".format(best))
+            print("Starting CMA training")
+            while not es.stop():
+                if cur_best is not None and - cur_best > target_return:
+                    print("Already better than target, breaking...")
                     break
 
-            epoch += 1
+                r_list = [0] * pop_size  # result list
+                solutions = es.ask()
 
-            # break
+                # print('r_list len: ', len(r_list))
+                # print('solution len: ', len(solutions))
+                # print('solution shape: ', solutions[0].shape)
+                # print('parameters shape:', flat_params.shape)
+
+                # push parameters to queue
+                for s_id, s in enumerate(solutions):
+                    for _ in range(n_samples):
+                        p_queue.put((s_id, s))
+                
+                # print('queue: ', p_queue.qsize())
+                # print('range: ', pop_size*n_samples)
+
+                for _ in range(pop_size * n_samples):
+                    s_id, params = p_queue.get()
+                    r_queue.put((
+                            s_id, 
+                            self.roller.rollout(self.env, self, self.c, params, display=True)
+                        ))
+
+                # retrieve results
+                if display:
+                    pbar = tqdm(total=pop_size * n_samples)
+
+                for _ in range(pop_size * n_samples):
+
+                    r_s_id, r = r_queue.get(p_queue.qsize())
+                    r_list[r_s_id] += r / n_samples
+                    c_queue.put((r_s_id, r))
+
+                    if display:
+                        pbar.update(1)
+
+                if display:
+                    pbar.close()
+
+                # print('queue: ', p_queue.qsize())
+                es.tell(solutions, r_list)
+                es.disp()
+
+                # evaluation and saving
+                if epoch % log_step == log_step - 1:
+
+                    print("copy of r_queue: ", c_queue.qsize())
+                    best_params, best, std_best = self.roller.evaluate(solutions, r_list, r_queue=c_queue)
+                    # best_params, best, std_best = self.roller.evaluate(solutions, r_list, r_queue=r_queue)
+                    print("Current evaluation: {}".format(best))
+
+                    if not cur_best or cur_best > best:
+                        cur_best = best
+                        print("Saving new best with value {}+-{}...".format(-cur_best, std_best))
+            
+                        # load parameters into controller
+                        for p, p_0 in zip(self.c.parameters(), params):
+                            p.data.copy_(p_0)
+
+                    if - best > target_return:
+                        print("Terminating controller training with value {}...".format(best))
+                        break
+
+                epoch += 1
+
+                # break
         return
         ##########################################################################
 

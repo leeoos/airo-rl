@@ -29,7 +29,7 @@ class Trainer():
 
         return model
     
-    def train(self, model_, data_, batch_size_=32, epochs_=100, lr_=0.001, retrain_=False):
+    def train(self, model_, data_, batch_size_=32, epochs_=100, lr_=0.001, retrain_=True):
 
         if retrain_: os.remove('./models/'+model_.name.lower()+'.pt')
         trained_model = copy.deepcopy(model_)

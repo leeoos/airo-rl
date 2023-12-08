@@ -15,7 +15,6 @@ class Rollout():
         """ Execute a random rollout and returns actions and observations """
 
         env.reset()
-
         rollout_obs = []
         rollout_actions = []
 
@@ -30,7 +29,8 @@ class Rollout():
 
             action = torch.from_numpy(action).float()
             rollout_actions.append(action)
-        
+            
+        env.reset()
         rollout_obs = torch.stack(rollout_obs, dim=0)
         rollout_obs = rollout_obs.permute(0,1,3,2).permute(0,2,1,3)
         rollout_actions = torch.stack(rollout_actions, dim=0)
