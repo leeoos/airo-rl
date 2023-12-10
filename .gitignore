@@ -165,3 +165,7 @@ handin/
 # VSCode
 .vscode/
 
+# project
+log/
+dataset/
+
