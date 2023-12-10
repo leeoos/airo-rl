@@ -110,7 +110,7 @@ class Policy(nn.Module):
         """Train the entire network or just the controller module"""
 
         # set to True to retarin vae and rnn
-        train_vae = False
+        train_vae = True
         train_rnn = False
 
         if train_vae: 
