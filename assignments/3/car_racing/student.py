@@ -10,7 +10,7 @@ from torch import Tensor, List
 from torch.multiprocessing import Process, Queue
 from torch.distributions.normal import Normal
 
-from os import mkdir, unlink, listdir, getpid
+from os import mkdir, remove, unlink, listdir, getpid
 from os.path import join, exists
 from tqdm import tqdm
 from time import sleep
@@ -52,7 +52,7 @@ class Policy(nn.Module):
         self.modules_dir = './checkpoints/'
        
         # models
-        self.vae = VAE(img_channels=3, latent_size=LATENT)
+        self.vae = VAE(img_channels=3, latent_size=LATENT).to(self.device)
         
         # self.rnn = MDN_RNN(
         #     input_size = self.latent_dim + self.action_space_dim, 
@@ -125,7 +125,7 @@ class Policy(nn.Module):
             self.vae = vae_trainer.train_vae(
                 model=self.vae,
                 data=observations,
-                epochs=1,
+                epochs=10,
                 device=self.device,
                 save='./checkpoints/'
             )
@@ -164,15 +164,19 @@ class Policy(nn.Module):
             if not exists(tmp_dir):
                 mkdir(tmp_dir)
             else:
+                # remove(tmp_dir)
+                # mkdir(tmp_dir)
                 for fname in listdir(tmp_dir):
                     unlink(join(tmp_dir, fname))
 
-
+            list_of_process = []
             for p_index in range(num_workers):
-                Process(
+                p = Process(
                     target=self.slave_routine, 
                     args=(self.p_queue, self.r_queue, self.e_queue, p_index, tmp_dir)
-                ).start()
+                )
+                p.start()
+                list_of_process.append(p)
             
             ### END THREDS ###
 
@@ -180,7 +184,17 @@ class Policy(nn.Module):
             flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
             es = cma.CMAEvolutionStrategy(flat_params, 0.1, {'popsize':pop_size})
 
-            p_list = []
+            # sleep(10.)
+            # self.p_queue.put(('test', 'test'))
+            # self.slave_routine(self.p_queue, self.r_queue, self.e_queue, p_index, tmp_dir)
+            # i = 0
+            # while True:
+            #     self.p_queue.put((0, 0))
+            #     print(i)
+            #     sleep(2.)
+            #     i += 1
+            #     if i >+ 10 : break
+
 
             # define current best and load parameters
             cur_best = None
@@ -198,8 +212,10 @@ class Policy(nn.Module):
             cur_best = None
             target_return = 50 #950
 
+            print("Wating for threds to start... ")
+            sleep(100.)
             print("Starting CMA training")
-            while not es.stop() and epoch <= 10:
+            while not es.stop() and epoch <= 5:
 
                 if cur_best is not None and - cur_best > target_return:
                     print("Already better than target, breaking...")
@@ -220,7 +236,8 @@ class Policy(nn.Module):
                 for _ in range(pop_size * n_samples):
 
                     while self.r_queue.empty():
-                        sleep(.1)
+                        ...
+                        # sleep(1.)
 
                     r_s_id, r = self.r_queue.get()
                     r_list[r_s_id] += r / n_samples
@@ -241,7 +258,7 @@ class Policy(nn.Module):
                     # print("copy of r_queue: ", c_queue.qsize())
                     # best_params, best = self.evaluate(solutions, r_list, p_queue=cp_queue, r_queue=c_queue)
                     best_params, best, std_best = self.evaluate(solutions, r_list, rollouts=24)
-                    print("Current evaluation: {}".format(best))
+                    print("Current evaluation: {}".format(-best))
 
                     if not cur_best or cur_best > best:
                         cur_best = best
@@ -268,6 +285,8 @@ class Policy(nn.Module):
                 print("End of epoch: ", epoch)
 
         self.e_queue.put('EOP')
+        for p in list_of_process:
+            p.terminate()
         return
     ##########################################################################
   
@@ -281,11 +300,12 @@ class Policy(nn.Module):
             while self.e_queue.empty():
                 if self.p_queue.empty():
                     print("Sleeping")
-                    sleep(.1)
+                    sleep(1.)
                 else:
                     print("Working")
                     s_id, params = self.p_queue.get()
                     self.r_queue.put((s_id, self.roller.rollout(self.env, self, self.c, params, display=True)))
+            print("End of my life")
 
 
     def evaluate(self, solutions, results, rollouts=100):
@@ -315,7 +335,7 @@ class Policy(nn.Module):
             exit(1)
     
     def save(self):
-        print("Saving model ")
+        print("Saving model")
         torch.save(self.state_dict(), 'model.pt')
 
     def load(self): 
