@@ -19,7 +19,7 @@ from modules.vae import LATENT, OBS_SIZE
 
 def train_vae(model, 
               data, 
-              batch_size=32, 
+              batch_size_=32, 
               epochs=100, 
               lr_=0.001, 
               device='cpu', 
@@ -27,7 +27,7 @@ def train_vae(model,
     ):
 
     dataset = TensorDataset(data, data)
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=batch_size_, shuffle=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr_)
 
     model.train()
@@ -101,7 +101,7 @@ if __name__ == "__main__":
             model=vae_model,
             data=observations,
             epochs=epochs,
-            batch_size=batch,
+            batch_size_=batch,
             device=device,
             lr_=2.5e-4
         )
