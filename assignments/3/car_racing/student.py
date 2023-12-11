@@ -19,7 +19,7 @@ import cma
 from modules.vae import VAE 
 from utils.rollout import Rollout
 from modules.vae import LATENT, OBS_SIZE
-from train.train_vae import train_vae
+import train.train_vae as vae_trainer
 # from modules.mdn_rnn import MDN_RNN
 
 ACTIONS = 3
@@ -93,29 +93,49 @@ class Policy(nn.Module):
 
             observations = torch.load(self.data_dir+'observations.pt')
 
-            self.vae = train_vae(
+            self.vae = vae_trainer.train_vae(
                 model=self.vae,
                 data=observations,
                 epochs=10,
                 device=self.device,
-                save='./checkpoints/'
-            )
-        else:
-            self.vae = self.vae.load(self.modules_dir).to(self.device)
+                save_dir=False
+            ).to(self.device)
 
             ####DEGUB####
-            X = torch.load(self.data_dir+'observations.pt')
+            X = torch.load(self.data_dir+'observations.pt').to(self.device)
             samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
             decodedSamples, _, _ = self.vae.forward(samples)
             
             for index, obs in enumerate(samples):
                 plt.subplot(5, 4, 2*index +1)
-                obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2))
+                obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2)).cpu()
                 plt.imshow(obs.numpy(), interpolation='nearest')
 
             for index, dec in enumerate(decodedSamples):
                 plt.subplot(5, 4, 2*index +2)
-                decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2))
+                decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2)).cpu()
+                plt.imshow(decoded.detach().numpy(), interpolation="nearest")
+
+            plt.show()
+            sleep(2.)
+            plt.close()
+            ####DEGUB####
+        else:
+            self.vae = self.vae.load(self.modules_dir).to(self.device)
+
+            ####DEGUB####
+            X = torch.load(self.data_dir+'observations.pt').to(self.device)
+            samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
+            decodedSamples, _, _ = self.vae.forward(samples)
+            
+            for index, obs in enumerate(samples):
+                plt.subplot(5, 4, 2*index +1)
+                obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2)).cpu()
+                plt.imshow(obs.numpy(), interpolation='nearest')
+
+            for index, dec in enumerate(decodedSamples):
+                plt.subplot(5, 4, 2*index +2)
+                decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2)).cpu()
                 plt.imshow(decoded.detach().numpy(), interpolation="nearest")
 
             plt.show()
@@ -140,17 +160,13 @@ class Policy(nn.Module):
         pop_size = 4
         n_samples = 4 
         generation = 0
-        target_return = 50 #950
+        target_return = 200 #950
 
         # log variables
         log_step = 3 # print log each n steps
         display = True
         render = False
         
-        params = self.c.parameters()
-        flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
-        es = cma.CMAEvolutionStrategy(flat_params, 0.1, {'popsize':pop_size})
-
         # define current best and load parameters
         cur_best = None
         c_checkpoint = self.modules_dir+'controller.pt'
@@ -160,6 +176,10 @@ class Policy(nn.Module):
             cur_best = - state['reward']
             self.c.load_state_dict(state['state_dict'])
             print("Previous best was {}...".format(-cur_best))
+
+        params = self.c.parameters()
+        flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
+        es = cma.CMAEvolutionStrategy(flat_params, 0.1, {'popsize':pop_size})
 
         print("Starting CMA training")
         start_time = time.time()

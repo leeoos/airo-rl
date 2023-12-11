@@ -19,7 +19,7 @@ from modules.vae import LATENT, OBS_SIZE
 
 def train_vae(model, 
               data, 
-              batch_size=32, 
+              batch_size_=32, 
               epochs=100, 
               lr_=0.001, 
               device='cpu', 
@@ -27,7 +27,7 @@ def train_vae(model,
     ):
 
     dataset = TensorDataset(data, data)
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=batch_size_, shuffle=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr_)
 
     model.train()
@@ -95,7 +95,7 @@ if __name__ == "__main__":
             batch_size_=batch,
             device=device,
             lr_=2.5e-4
-        )
+        ).to(device)
 
     enable_test = True
 
@@ -119,19 +119,19 @@ if __name__ == "__main__":
             X.append(observation)
 
         X = torch.stack(X, dim=0)
-        X = X.permute(0,1,3,2).permute(0,2,1,3)
+        X = X.permute(0,1,3,2).permute(0,2,1,3).to(device)
         
         samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
         decodedSamples, _, _ = vae_model.forward(samples)
         
         for index, obs in enumerate(samples):
             plt.subplot(5, 4, 2*index +1)
-            obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2))
+            obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2)).cpu()
             plt.imshow(obs.numpy(), interpolation='nearest')
 
         for index, dec in enumerate(decodedSamples):
             plt.subplot(5, 4, 2*index +2)
-            decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2))
+            decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2)).cpu()
             plt.imshow(decoded.detach().numpy(), interpolation="nearest")
 
         plt.show()
