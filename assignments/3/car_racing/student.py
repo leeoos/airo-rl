@@ -14,20 +14,13 @@ from os import mkdir, remove, unlink, listdir, getpid
 from os.path import join, exists
 from tqdm import tqdm
 from time import sleep
-from tqdm import tqdm
-import time
+import numpy as np
 import sys
-
-import numpy as np
-import matplotlib.pyplot as plt
-
-import numpy as np
-import matplotlib.pyplot as plt
 
 from utils.rollout import Rollout
 from modules.vae import VAE 
 from modules.vae import LATENT, OBS_SIZE
-from train.train_vae import train_vae
+import train.train_vae as vae_trainer
 # from modules.mdn_rnn import MDN_RNN
 
 ACTIONS = 3
@@ -48,18 +41,17 @@ class Policy(nn.Module):
         
         # global variables
         self.device = device
+        # self.starting_state = True
+        # self.memory = None # rnn state is empy at the beginning
         self.modules_dir = './checkpoints/'
-        self.data_dir = './dataset/'
        
         # models
-        self.vae = VAE().to(self.device)
+        self.vae = VAE(img_channels=3, latent_size=LATENT).to(self.device)
         
         # self.rnn = MDN_RNN(
         #     input_size = self.latent_dim + self.action_space_dim, 
         #     output_size = self.latent_dim + self.action_space_dim
         # ).to(self.device)
-        # self.starting_state = True
-        # self.memory = None # rnn state is empy at the beginning
 
         self.c = nn.Linear(
             in_features= LATENT, #+ self.hidden_dim, 
@@ -95,13 +87,11 @@ class Policy(nn.Module):
         state = torch.tensor(state/255, dtype=torch.float)
         state = self.transform(state.permute(0,2,1).permute(1,0,2))
         state = state.unsqueeze(0).to(self.device)
+        # state = state.unsqueeze(0).permute(0,1,3,2).permute(0,2,1,3).to(self.device)
 
-        # obs compression
-        mu, logvar = self.vae.encode(state.float())
-        z = self.vae.latent(mu, logvar)
-        
-        # c_in, z, h = ...
-        a = self.c(z).to(self.device)
+        # c_in, z, h = self.forward(state)
+        c_in = self.forward(state)
+        a = self.c(c_in).to(self.device)
 
         # rnn_in = torch.concat((a, z), dim=1).to(self.device)
         # _, hidden = self.rnn.forward_lstm(rnn_in) # lstm outputs: out, (h_n, c_n)
@@ -119,13 +109,14 @@ class Policy(nn.Module):
 
         if train_vae: 
 
-            if not exists(self.data_dir):
+            data_dir = './data/dataset/'
+            if not exists(data_dir):
                 print("Error: no data")
                 exit(1)
 
-            observations = torch.load(self.data_dir+'observations.pt')
+            observations = torch.load(data_dir+'observations.pt')
 
-            self.vae = train_vae(
+            self.vae = vae_trainer.train_vae(
                 model=self.vae,
                 data=observations,
                 epochs=10,
@@ -133,136 +124,210 @@ class Policy(nn.Module):
                 save='./checkpoints/'
             )
         else:
-            self.vae = self.vae.load(self.modules_dir).to(self.device)
-
-            ####DEGUB####
-            X = torch.load(self.data_dir+'observations.pt')
-            samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
-            decodedSamples, _, _ = self.vae.forward(samples)
-            
-            for index, obs in enumerate(samples):
-                plt.subplot(5, 4, 2*index +1)
-                obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2))
-                plt.imshow(obs.numpy(), interpolation='nearest')
-
-            for index, dec in enumerate(decodedSamples):
-                plt.subplot(5, 4, 2*index +2)
-                decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2))
-                plt.imshow(decoded.detach().numpy(), interpolation="nearest")
-
-            plt.show()
-            sleep(2.)
-            plt.close()
-            ####DEGUB####
-
+            self.vae = self.load_module(VAE(img_channels=3, latent_size=LATENT), self.modules_dir).to(self.device)
         
         if train_rnn: ...
         else: ...
 
-        ########################### TRAIN CONTROLLER  ############################
+        #################### TRAIN CONTROLLER  MULTITHRED ########################
         ##########################################################################
+        train_controller = True # set to True to retarin controller
 
-        # ####DEGUB####
-        # for p in self.c.parameters():
-        #     print('previous parameters: {}'.format(p))
-        #     break
-        # ####DEGUB####
+        if train_controller:
+            pop_size = 6
+            n_samples = 6 # 1 for signle thread
+            num_workers = 8
 
-        # training parameters
-        pop_size = 4
-        n_samples = 4 
-        generation = 0
-        target_return = 50 #950
+            ### START THREDS ###
 
-        # log variables
-        log_step = 3 # print log each n steps
-        display = True
-        render = False
-        
-        params = self.c.parameters()
-        flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
-        es = cma.CMAEvolutionStrategy(flat_params, 0.1, {'popsize':pop_size})
+            tmp_dir = 'log/'
+            if not exists(tmp_dir):
+                mkdir(tmp_dir)
+            else:
+                # remove(tmp_dir)
+                # mkdir(tmp_dir)
+                for fname in listdir(tmp_dir):
+                    unlink(join(tmp_dir, fname))
 
-        # define current best and load parameters
-        cur_best = None
-        c_checkpoint = self.modules_dir+'controller.pt'
-        print("Attempting to load previous best...")
-        if exists(c_checkpoint):
-            state = torch.load(c_checkpoint, map_location=self.device)
-            cur_best = - state['reward']
-            self.c.load_state_dict(state['state_dict'])
-            print("Previous best was {}...".format(-cur_best))
-
-        print("Starting CMA training")
-        start_time = time.time()
-
-        while not es.stop(): # and generation < 20:
-
-            if cur_best is not None and - cur_best > target_return:
-                print("Already better than target, breaking...")
-                break
-
-            # compute solutions
-            r_list = [0] * pop_size  # result list
-            solutions = es.ask()
-
-            if display: pbar = tqdm(total=pop_size * n_samples)
+            list_of_process = []
+            for p_index in range(num_workers):
+                p = Process(
+                    target=self.slave_routine, 
+                    args=(self.p_queue, self.r_queue, self.e_queue, p_index, tmp_dir)
+                )
+                p.start()
+                list_of_process.append(p)
             
-            for s_id, params in enumerate(solutions):
-                for _ in range(n_samples):
-                    r_list[s_id] += self.roller.rollout(self, params, device=self.device) / n_samples
-                    if display: pbar.update(1)
+            ### END THREDS ###
 
-            if display: pbar.close()
+            params = self.c.parameters()
+            flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
+            es = cma.CMAEvolutionStrategy(flat_params, 0.1, {'popsize':pop_size})
 
-            es.tell(solutions, r_list)
-            es.disp()
+            # sleep(10.)
+            # generations = 0
+            # while not es.stop():
+            #     print("Generation: ", generations)
+            #     r_list = [0] * pop_size  # result list
+            #     solutions = es.ask()
+            #     for s_id, s in enumerate(solutions):
+            #         for _ in range(n_samples):
+            #             self.p_queue.put((s_id, s))
+            #     print('Pqueue : ', self.p_queue.qsize())
 
-            # evaluation and saving
-            if  generation % log_step == log_step - 1:
+            #     while self.r_queue.empty():
+            #         sleep(.1)
+            #     print('Rqueue : ', self.r_queue.qsize())
+            #     sleep(2.)
+            #     generations += 1
+            #     if generations >= 10 : break
+            
 
-                # render = True
-                best_params, best = self.evaluate(solutions, r_list, render)
-                print("Current evaluation: {}".format(-best))
+            # define current best and load parameters
+            cur_best = None
+            ctrl_file = self.modules_dir+'controller.pt'
+            print("Attempting to load previous best...")
+            if exists(ctrl_file):
+                state = torch.load(ctrl_file, map_location=self.device)
+                cur_best = - state['reward']
+                self.c.load_state_dict(state['state_dict'])
+                print("Previous best was {}...".format(-cur_best))
 
-                if not cur_best or cur_best > best:
-                    cur_best = best
-                    print("Saving new best with value {}...".format(-cur_best))
-        
-                    # load parameters into controller
-                    for p, p_0 in zip(self.c.parameters(), best_params):
-                        p.data.copy_(p_0)
+            generation = 0
+            log_step = 3 # print each n steps
+            display = True
+            cur_best = None
+            target_return = 50 #950
+            
+            print("Wating for threds to start... ")
+            print("Starting CMA training")
 
-                    torch.save(
-                        {
-                            'epoch': generation,
-                            'reward': - cur_best,
-                            'state_dict': self.c.state_dict()
-                        },
-                        c_checkpoint
-                    )
+            while not es.stop() and generation < 20:
 
-                print("--- %s seconds since start training ---" % (time.time() - start_time)) 
-
-                if - cur_best > target_return:
-                    print("Terminating controller training with value {}...".format(-cur_best))
+                if cur_best is not None and - cur_best > target_return:
+                    print("Already better than target, breaking...")
                     break
 
-            generation += 1
-            render = False
-            print("End of generation: ", generation)
+                # Computing solutions
+                r_list = [0] * pop_size  # result list
+                solutions = es.ask()
+
+                # push parameters to queue
+                for s_id, s in enumerate(solutions):
+                    for _ in range(n_samples):
+                        self.p_queue.put((s_id, s))
+                
+                if display:
+                    pbar = tqdm(total=pop_size * n_samples)
+
+                for _ in range(pop_size * n_samples):
+
+                    # ctrl = 0
+                    while self.r_queue.empty():
+                        sleep(1.)
+
+                    # print('R queue : ', self.r_queue.qsize())
+                    r_s_id, r = self.r_queue.get()
+                    r_list[r_s_id] += r / n_samples
+
+                    if display:
+                        pbar.update(1)
+
+                if display:
+                    pbar.close()
+
+                es.tell(solutions, r_list)
+                # es.disp()
+
+                # evaluation and saving
+                if  generation % log_step == log_step - 1:
+
+                    # print("copy of r_queue: ", c_queue.qsize())
+                    # best_params, best = self.evaluate(solutions, r_list, p_queue=cp_queue, r_queue=c_queue)
+                    best_params, best, std_best = self.evaluate(solutions, r_list, rollouts=24)
+                    print("Current evaluation: {}".format(-best))
+
+                    if not cur_best or cur_best > best:
+                        cur_best = best
+                        std_best = 0 # tmp
+                        print("Saving new best with value {}+-{}...".format(-cur_best, std_best))
             
+                        # load parameters into controller
+                        for p, p_0 in zip(self.c.parameters(), best_params):
+                            p.data.copy_(p_0)
+
+                        torch.save(
+                            {
+                                'epoch': generation,
+                                'reward': - cur_best,
+                                'state_dict': self.c.state_dict()
+                            },
+                            ctrl_file
+                        )
+
+                    if - best > target_return:
+                        print("Terminating controller training with value {}...".format(best))
+                        break
+                generation += 1
+                print("End of generation: ", generation)
+
+            self.e_queue.put('EOP')
+            for p in list_of_process:
+                p.terminate()
         return
-    
-    
-    def evaluate(self, solutions, results, render):
-        print("Evaluating...")
+    ##########################################################################
+  
+    def slave_routine(self, p_queue, r_queue, e_queue, p_index, tmp_dir):
+
+        # redirect streams
+        sys.stdout = open(join(tmp_dir, str(getpid()) + '.out'), 'a')
+        sys.stderr = open(join(tmp_dir, str(getpid()) + '.err'), 'a')
+        
+        with torch.no_grad():
+            roller = Rollout()
+
+            # with open('foo', 'a') as f: f.write('e: '+str(self.e_queue.qsize())+'\n')
+            while self.e_queue.empty():
+                if self.p_queue.empty():
+                    ...
+                else:
+                    # with open('foo', 'a') as f: f.write('p: '+str(self.p_queue.qsize())+'\n')
+                    s_id, params = self.p_queue.get()
+                    # self.r_queue.put((s_id, self.roller.rollout(self.env, self, self.c, params))
+                    value = roller.rollout(self.vae, self.c, params, device=self.device)
+                    # value = self.roller.sasso()
+                    # with open('foo', 'a') as f: f.write('v: '+str(value)+'\n')
+                    # value = 42
+                    self.r_queue.put((s_id, value))
+                    # with open('foo', 'a') as f: f.write('r: '+str(self.r_queue.qsize())+'\n')
+            print("End of my life")
+
+
+    def evaluate(self, solutions, results, rollouts=100):
         index_min = np.argmin(results)
         best_guess = solutions[index_min]
-        value = self.roller.rollout(self, best_guess, device=self.device, render=render)
-        return best_guess, value
+        restimates = []
+
+        for s_id in range(rollouts):
+            self.p_queue.put((s_id, best_guess))
+
+        print("Evaluating...")
+        for _ in tqdm(range(rollouts)):
+            while self.r_queue.empty():
+                sleep(.1)
+            restimates.append(self.r_queue.get()[1])
+
+        return best_guess, np.mean(restimates), np.std(restimates)
     
-    ##########################################################################
+    #######################################################################################
+    def load_module(self, model, model_dir):
+        if exists(model_dir+model.name.lower()+'.pt'):
+            print("Loading model "+model.name+" state parameters")
+            model.load(model_dir)
+            return model
+        else:
+            print("Error no model "+model.name.lower()+" found!")
+            exit(1)
     
     def save(self):
         print("Saving model")
