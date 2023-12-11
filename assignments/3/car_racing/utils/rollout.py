@@ -11,15 +11,8 @@ from modules.vae import LATENT, OBS_SIZE
 class Rollout():
 
     def __init__(self):
-        self.env = gym.make('CarRacing-v2', continuous=True, render_mode='rgb_array')
+        pass
 
-        self.transform = transforms.Compose([
-            transforms.ToPILImage(),
-            transforms.Resize((OBS_SIZE, OBS_SIZE)),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-        ])
-    
     # ctallec function:
     def unflatten_parameters(self, params, example, device):
         """ Unflatten parameters. Note: example is generator of parameters (module.parameters()), used to reshape params """
@@ -44,8 +37,11 @@ class Rollout():
     #     torch.clip(a, min = -1, max = 1 )
     #     return a.cpu().float().squeeze().detach().numpy()
 
-    def rollout(self, agent, params=None, limit=1100, device='cpu', display=False):
+    def rollout(self, agent, params=None, limit=1100, device='cpu', render=False):
         """ Execute a rollout and returns minus cumulative reward. """
+
+        render_mode = 'human' if render else 'rgb_array'
+        self.env = gym.make('CarRacing-v2', continuous=True, render_mode=render_mode)
 
         if params is not None:
             params = self.unflatten_parameters(params, agent.c.parameters(), device)
@@ -54,9 +50,14 @@ class Rollout():
             for p, p_0 in zip(agent.c.parameters(), params):
                 p.data.copy_(p_0)
 
+        # ####DEGUB####
+        # for p in agent.c.parameters():
+        #     print('new parameters: {}'.format(p))
+        #     break
+        # ####DEGUB####
+
         obs, _ = self.env.reset()
         cumulative = 0
-        step_counter = 0 
         done = False
 
         for _ in range(limit):
@@ -67,7 +68,5 @@ class Rollout():
             if done: break
 
             cumulative += reward
-
-        if display: print(f"Total Reward: {cumulative}, steps: {step_counter}")
         return (-cumulative)
 

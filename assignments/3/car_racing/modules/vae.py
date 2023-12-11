@@ -79,8 +79,14 @@ class VAE(nn.Module):
         torch.save(self.state_dict(), dest+self.name.lower()+'.pt')
 
     def load(self, dir): 
-        self.load_state_dict(torch.load(dir+self.name.lower()+'.pt', map_location=self.device))
-    
+        if exists(dir+self.name.lower()+'.pt'):
+            print("Loading model "+self.name+" state parameters")
+            self.load_state_dict(torch.load(dir+self.name.lower()+'.pt', map_location=self.device))
+            return self
+        else:
+            print("Error no model "+self.name.lower()+" found!")
+            exit(1)
+            
 
 
 # class Encoder(nn.Module):

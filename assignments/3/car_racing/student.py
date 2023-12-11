@@ -6,7 +6,11 @@ from os import mkdir, remove, unlink, listdir, getpid
 from os.path import join, exists
 from time import sleep
 from tqdm import tqdm
+import time
 import sys
+
+import numpy as np
+import matplotlib.pyplot as plt
 
 import gymnasium as gym
 import numpy as np
@@ -15,7 +19,7 @@ import cma
 from modules.vae import VAE 
 from utils.rollout import Rollout
 from modules.vae import LATENT, OBS_SIZE
-import train.train_vae as vae_trainer
+from train.train_vae import train_vae
 # from modules.mdn_rnn import MDN_RNN
 
 ACTIONS = 3
@@ -32,17 +36,18 @@ class Policy(nn.Module):
         
         # global variables
         self.device = device
-        # self.starting_state = True
-        # self.memory = None # rnn state is empy at the beginning
         self.modules_dir = './checkpoints/'
+        self.data_dir = './dataset/'
        
         # models
-        self.vae = VAE(img_channels=3, latent_size=LATENT).to(self.device)
+        self.vae = VAE().to(self.device)
         
         # self.rnn = MDN_RNN(
         #     input_size = self.latent_dim + self.action_space_dim, 
         #     output_size = self.latent_dim + self.action_space_dim
         # ).to(self.device)
+        # self.starting_state = True
+        # self.memory = None # rnn state is empy at the beginning
 
         self.c = nn.Linear(
             in_features= LATENT, #+ self.hidden_dim, 
@@ -63,9 +68,8 @@ class Policy(nn.Module):
         mu, logvar = self.vae.encode(state.float())
         z = self.vae.latent(mu, logvar)
         
-        # c_in, z, h = self.forward(state)
-        c_in = self.forward(state)
-        a = self.c(c_in).to(self.device)
+        # c_in, z, h = ...
+        a = self.c(z).to(self.device)
 
         # rnn_in = torch.concat((a, z), dim=1).to(self.device)
         # _, hidden = self.rnn.forward_lstm(rnn_in) # lstm outputs: out, (h_n, c_n)
@@ -83,14 +87,13 @@ class Policy(nn.Module):
 
         if train_vae: 
 
-            data_dir = './dataset/'
-            if not exists(data_dir):
+            if not exists(self.data_dir):
                 print("Error: no data")
                 exit(1)
 
-            observations = torch.load(data_dir+'observations.pt')
+            observations = torch.load(self.data_dir+'observations.pt')
 
-            self.vae = vae_trainer.train_vae(
+            self.vae = train_vae(
                 model=self.vae,
                 data=observations,
                 epochs=10,
@@ -98,120 +101,136 @@ class Policy(nn.Module):
                 save='./checkpoints/'
             )
         else:
-            self.vae = self.load_module(VAE(img_channels=3, latent_size=LATENT), self.modules_dir).to(self.device)
+            self.vae = self.vae.load(self.modules_dir).to(self.device)
+
+            ####DEGUB####
+            X = torch.load(self.data_dir+'observations.pt')
+            samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
+            decodedSamples, _, _ = self.vae.forward(samples)
+            
+            for index, obs in enumerate(samples):
+                plt.subplot(5, 4, 2*index +1)
+                obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2))
+                plt.imshow(obs.numpy(), interpolation='nearest')
+
+            for index, dec in enumerate(decodedSamples):
+                plt.subplot(5, 4, 2*index +2)
+                decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2))
+                plt.imshow(decoded.detach().numpy(), interpolation="nearest")
+
+            plt.show()
+            sleep(2.)
+            plt.close()
+            ####DEGUB####
+
         
         if train_rnn: ...
         else: ...
 
-        #################### TRAIN CONTROLLER  ###################################
+        ########################### TRAIN CONTROLLER  ############################
         ##########################################################################
-        train_controller = True # set to True to tarin controller
 
-        if train_controller:
-            pop_size = 4
-            n_samples = 4 # 1 for signle thread
+        # ####DEGUB####
+        # for p in self.c.parameters():
+        #     print('previous parameters: {}'.format(p))
+        #     break
+        # ####DEGUB####
 
-            params = self.c.parameters()
-            flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
-            es = cma.CMAEvolutionStrategy(flat_params, 0.1, {'popsize':pop_size})
+        # training parameters
+        pop_size = 4
+        n_samples = 4 
+        generation = 0
+        target_return = 50 #950
 
+        # log variables
+        log_step = 3 # print log each n steps
+        display = True
+        render = False
+        
+        params = self.c.parameters()
+        flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
+        es = cma.CMAEvolutionStrategy(flat_params, 0.1, {'popsize':pop_size})
 
-            # define current best and load parameters
-            cur_best = None
-            ctrl_file = self.modules_dir+'controller.pt'
-            print("Attempting to load previous best...")
-            if exists(ctrl_file):
-                state = torch.load(ctrl_file, map_location=self.device)
-                cur_best = - state['reward']
-                self.c.load_state_dict(state['state_dict'])
-                print("Previous best was {}...".format(-cur_best))
+        # define current best and load parameters
+        cur_best = None
+        c_checkpoint = self.modules_dir+'controller.pt'
+        print("Attempting to load previous best...")
+        if exists(c_checkpoint):
+            state = torch.load(c_checkpoint, map_location=self.device)
+            cur_best = - state['reward']
+            self.c.load_state_dict(state['state_dict'])
+            print("Previous best was {}...".format(-cur_best))
 
-            generation = 0
-            log_step = 3 # print each n steps
-            display = True
-            cur_best = None
-            target_return = 50 #950
+        print("Starting CMA training")
+        start_time = time.time()
+
+        while not es.stop(): # and generation < 20:
+
+            if cur_best is not None and - cur_best > target_return:
+                print("Already better than target, breaking...")
+                break
+
+            # compute solutions
+            r_list = [0] * pop_size  # result list
+            solutions = es.ask()
+
+            if display: pbar = tqdm(total=pop_size * n_samples)
             
-            print("Wating for threds to start... ")
-            print("Starting CMA training")
+            for s_id, params in enumerate(solutions):
+                for _ in range(n_samples):
+                    r_list[s_id] += self.roller.rollout(self, params, device=self.device) / n_samples
+                    if display: pbar.update(1)
 
-            while not es.stop(): # and generation < 20:
+            if display: pbar.close()
 
-                if cur_best is not None and - cur_best > target_return:
-                    print("Already better than target, breaking...")
+            es.tell(solutions, r_list)
+            es.disp()
+
+            # evaluation and saving
+            if  generation % log_step == log_step - 1:
+
+                # render = True
+                best_params, best = self.evaluate(solutions, r_list, render)
+                print("Current evaluation: {}".format(-best))
+
+                if not cur_best or cur_best > best:
+                    cur_best = best
+                    print("Saving new best with value {}...".format(-cur_best))
+        
+                    # load parameters into controller
+                    for p, p_0 in zip(self.c.parameters(), best_params):
+                        p.data.copy_(p_0)
+
+                    torch.save(
+                        {
+                            'epoch': generation,
+                            'reward': - cur_best,
+                            'state_dict': self.c.state_dict()
+                        },
+                        c_checkpoint
+                    )
+
+                print("--- %s seconds since start training ---" % (time.time() - start_time)) 
+
+                if - cur_best > target_return:
+                    print("Terminating controller training with value {}...".format(-cur_best))
                     break
 
-                # Computing solutions
-                r_list = [0] * pop_size  # result list
-                solutions = es.ask()
-
-                if display:
-                    pbar = tqdm(total=pop_size * n_samples)
-              
-                for s_id, params in enumerate(solutions):
-                    for _ in range(n_samples):
-                        r_list[s_id] += self.roller.rollout(self.vae, self.c, params, device=self.device) / n_samples
-
-                        if display:
-                            pbar.update(1)
-
-                if display:
-                    pbar.close()
-
-                es.tell(solutions, r_list)
-                es.disp()
-
-                # evaluation and saving
-                if  generation % log_step == log_step - 1:
-
-                    best_params, best = self.evaluate2(solutions, r_list)
-                    print("Current evaluation: {}".format(-best))
-
-                    if not cur_best or cur_best > best:
-                        cur_best = best
-                        std_best = 0 # tmp
-                        print("Saving new best with value {}+-{}...".format(-cur_best, std_best))
-            
-                        # load parameters into controller
-                        for p, p_0 in zip(self.c.parameters(), best_params):
-                            p.data.copy_(p_0)
-
-                        torch.save(
-                            {
-                                'epoch': generation,
-                                'reward': - cur_best,
-                                'state_dict': self.c.state_dict()
-                            },
-                            ctrl_file
-                        )
-                    if - best > target_return:
-                        print("Terminating controller training with value {}...".format(best))
-                        break
-                generation += 1
-                print("End of generation: ", generation)
-
+            generation += 1
+            render = False
+            print("End of generation: ", generation)
             
         return
     
-    def evaluate2(self, solutions, results):
+    
+    def evaluate(self, solutions, results, render):
         print("Evaluating...")
         index_min = np.argmin(results)
         best_guess = solutions[index_min]
-        restimates = []
-
-        value = self.roller.rollout(self.vae, self.c, best_guess, device=self.device)
-
+        value = self.roller.rollout(self, best_guess, device=self.device, render=render)
         return best_guess, value
     
-    #######################################################################################
-    def load_module(self, model, model_dir):
-        if exists(model_dir+model.name.lower()+'.pt'):
-            print("Loading model "+model.name+" state parameters")
-            model.load(model_dir)
-            return model
-        else:
-            print("Error no model "+model.name.lower()+" found!")
-            exit(1)
+    ##########################################################################
     
     def save(self):
         print("Saving model")
