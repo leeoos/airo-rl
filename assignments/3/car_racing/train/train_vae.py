@@ -95,7 +95,7 @@ if __name__ == "__main__":
             batch_size_=batch,
             device=device,
             lr_=2.5e-4
-        )
+        ).to(device)
 
     enable_test = True
 
@@ -126,12 +126,12 @@ if __name__ == "__main__":
         
         for index, obs in enumerate(samples):
             plt.subplot(5, 4, 2*index +1)
-            obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2))
+            obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2)).cpu()
             plt.imshow(obs.numpy(), interpolation='nearest')
 
         for index, dec in enumerate(decodedSamples):
             plt.subplot(5, 4, 2*index +2)
-            decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2))
+            decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2)).cpu()
             plt.imshow(decoded.detach().numpy(), interpolation="nearest")
 
         plt.show()
