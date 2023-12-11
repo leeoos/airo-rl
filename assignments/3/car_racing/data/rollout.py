@@ -60,15 +60,13 @@ class Rollout():
 
         for _ in range(limit):
             action = self.get_action(obs, vae, controller, device) #agent.act(obs) #self.env.action_space.sample() #agent.act(obs)
-            action = 0
-            with open('foo', 'a') as f: f.write('action taken\n')
+            # with open('foo', 'a') as f: f.write('action taken\n')
 
             obs, reward, terminated, truncated, _ = self.env.step(action)
-            with open('foo', 'a') as f: f.write('state observed\n')
+            # with open('foo', 'a') as f: f.write('state observed\n')
             
             # done = terminated 
             if done: break
-
 
             cumulative += reward
 

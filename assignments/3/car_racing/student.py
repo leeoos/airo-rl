@@ -134,9 +134,9 @@ class Policy(nn.Module):
         train_controller = True # set to True to retarin controller
 
         if train_controller:
-            pop_size = 4
-            n_samples = 4 # 1 for signle thread
-            num_workers = 16
+            pop_size = 6
+            n_samples = 6 # 1 for signle thread
+            num_workers = 8
 
             ### START THREDS ###
 
@@ -193,16 +193,16 @@ class Policy(nn.Module):
                 self.c.load_state_dict(state['state_dict'])
                 print("Previous best was {}...".format(-cur_best))
 
-            epoch = 0
+            generation = 0
             log_step = 3 # print each n steps
             display = True
             cur_best = None
             target_return = 50 #950
             
             print("Wating for threds to start... ")
-            # sleep(100.)
             print("Starting CMA training")
-            while not es.stop() and epoch <= 5:
+
+            while not es.stop() and generation < 20:
 
                 if cur_best is not None and - cur_best > target_return:
                     print("Already better than target, breaking...")
@@ -240,7 +240,7 @@ class Policy(nn.Module):
                 # es.disp()
 
                 # evaluation and saving
-                if  epoch % log_step == log_step - 1:
+                if  generation % log_step == log_step - 1:
 
                     # print("copy of r_queue: ", c_queue.qsize())
                     # best_params, best = self.evaluate(solutions, r_list, p_queue=cp_queue, r_queue=c_queue)
@@ -258,7 +258,7 @@ class Policy(nn.Module):
 
                         torch.save(
                             {
-                                'epoch': epoch,
+                                'epoch': generation,
                                 'reward': - cur_best,
                                 'state_dict': self.c.state_dict()
                             },
@@ -268,9 +268,8 @@ class Policy(nn.Module):
                     if - best > target_return:
                         print("Terminating controller training with value {}...".format(best))
                         break
-                epoch += 1
-                print("End of epoch: ", epoch)
-                if epoch >= 1:break
+                generation += 1
+                print("End of generation: ", generation)
 
             self.e_queue.put('EOP')
             for p in list_of_process:
@@ -287,20 +286,20 @@ class Policy(nn.Module):
         with torch.no_grad():
             roller = Rollout()
 
-            with open('foo', 'a') as f: f.write('e: '+str(self.e_queue.qsize())+'\n')
+            # with open('foo', 'a') as f: f.write('e: '+str(self.e_queue.qsize())+'\n')
             while self.e_queue.empty():
                 if self.p_queue.empty():
                     ...
                 else:
-                    with open('foo', 'a') as f: f.write('p: '+str(self.p_queue.qsize())+'\n')
+                    # with open('foo', 'a') as f: f.write('p: '+str(self.p_queue.qsize())+'\n')
                     s_id, params = self.p_queue.get()
                     # self.r_queue.put((s_id, self.roller.rollout(self.env, self, self.c, params))
                     value = roller.rollout(self.vae, self.c, params, device=self.device)
                     # value = self.roller.sasso()
-                    with open('foo', 'a') as f: f.write('v: '+str(value)+'\n')
+                    # with open('foo', 'a') as f: f.write('v: '+str(value)+'\n')
                     # value = 42
                     self.r_queue.put((s_id, value))
-                    with open('foo', 'a') as f: f.write('r: '+str(self.r_queue.qsize())+'\n')
+                    # with open('foo', 'a') as f: f.write('r: '+str(self.r_queue.qsize())+'\n')
             print("End of my life")
 
 
