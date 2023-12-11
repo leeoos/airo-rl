@@ -1,14 +1,18 @@
+import gymnasium as gym
+
+import sys
 import argparse
 from os import mkdir, unlink, listdir, getpid, remove
 from os.path import join, exists, dirname, abspath
-import sys
+sys.path.append(dirname(dirname(abspath(__file__))))
 
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
 from torch.utils.data import TensorDataset, DataLoader
 
-sys.path.append(dirname(dirname(abspath(__file__))))
+import numpy as np
+import matplotlib.pyplot as plt
 
 from modules.vae import VAE 
 from modules.vae import LATENT, OBS_SIZE
@@ -17,28 +21,18 @@ def train_vae(model,
               data, 
               batch_size=32, 
               epochs=100, 
-              lr=0.001, 
+              lr_=0.001, 
               device='cpu', 
-              save='../checkpoints/'
+              save_dir='../checkpoints/'
     ):
 
-    transform_train = transforms.Compose([
-        transforms.ToPILImage(),
-        transforms.Resize((OBS_SIZE, OBS_SIZE)),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-    ])
-
-
-    transformed_data = torch.stack([transform_train(image) for image in data])
-
-    dataset = TensorDataset(transformed_data, transformed_data)
+    dataset = TensorDataset(data, data)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr_)
 
     model.train()
-    train_loss = 0
-    log_step = (len(dataloader.dataset) // batch_size) // 2
+    # train_loss = 0
+    # log_step = (len(dataloader.dataset) // batch_size) // 2
     print("Training VAE")
 
     for epoch in range(epochs):
@@ -51,60 +45,106 @@ def train_vae(model,
             optimizer.zero_grad()
             recon_batch, mu, logvar = model(inputs)
             loss = loss_function(recon_batch, targets, mu, logvar)
-
+            
             # Backward pass and optimization
             loss.backward()
-            train_loss += loss.item()
+            # train_loss += loss.item()
             optimizer.step()
 
-            if batch_idx % log_step == 0:
-                print('Train Epoch: {} [{}/{} ({:.0f}%)] Loss: {:.6f}'.format(
-                    epoch+1, 
-                    batch_idx * len(inputs), 
-                    len(dataloader.dataset),
-                    100. * batch_idx / len(dataloader),
-                    loss.item() / len(data)
-                ))
-    # end of trainig
-    # insert here code for testing
+        if (epoch + 1) % 10 == 0:
+            print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
 
-    if save: model.save(save)
+    if save_dir: model.save(save_dir)
     return model
 
 
 def loss_function(recon_x, x, mu, logsigma):
     """ VAE loss function """
-    CE = F.cross_entropy(recon_x, x)
+    # CE = F.cross_entropy(recon_x, x)
+    # CE = F.cross_entropy(recon_x, x, reduction='sum')
+    MSE = F.mse_loss(recon_x, x, reduction='sum')
     KLD = -0.5 * torch.sum(1 + 2 * logsigma - mu.pow(2) - (2 * logsigma).exp())
-    return CE + KLD
+    return MSE + KLD
+
+
+def load_module(model, model_dir):
+    if exists(model_dir+model.name.lower()+'.pt'):
+        print("Loading model "+model.name+" state parameters")
+        model.load(model_dir)
+        return model
+    else:
+        print("Error no model "+model.name.lower()+" found!")
+        exit(1)
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('--train', action='store_true')
+    parser.add_argument('--test', action='store_true')
     parser.add_argument('--dir', type=str, help="Where to place rollouts")
     parser.add_argument('--epochs', type=int, help="training epochs")
     parser.add_argument('--batch', type=int, help="batch size")
     args = parser.parse_args()
 
-    if args.dir:
-        data_dir = args.dir 
-    else:
-        print("Error: no data")
-        exit(1)
-
+    data_dir = '../dataset/' if not args.dir else args.dir
+    epochs = 10 if not args.epochs else args.epochs
     batch = 32 if not args.batch else args.batch
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     observations = torch.load(data_dir+'observations.pt')
-    vae_model = VAE(3, LATENT).to(device)
+    vae_model = VAE().to(device)
 
-    train_vae(
-        model=vae_model,
-        data=observations,
-        epochs=args.epochs,
-        batch_size=args.batch,
-        device=device
-    )
+    print("Dataset shape: {}".format(observations.shape))
+
+    if args.train:
+        vae_model = train_vae(
+            model=vae_model,
+            data=observations,
+            epochs=epochs,
+            batch_size=batch,
+            device=device,
+            lr_=2.5e-4
+        )
+
+    enable_test = True
+
+    if args.test:
+
+        if not args.train:
+            modules_dir = '../checkpoints/'
+            vae_model = load_module(vae_model, modules_dir)
+
+        env = gym.make('CarRacing-v2', continuous=False, render_mode='rgb_array')
+        _, _ = env.reset()
+        done = False
+        t = 0
+        X = []
+        while not done:
+            action = int(np.random.rand() *3 +1)
+            t += 1
+            observation, reward, terminated, truncated, info = env.step(action)
+            done = truncated or terminated
+            observation = torch.from_numpy(observation).float() / 255
+            X.append(observation)
+
+        X = torch.stack(X, dim=0)
+        X = X.permute(0,1,3,2).permute(0,2,1,3)
+        
+        samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
+        decodedSamples, _, _ = vae_model.forward(samples)
+        
+        for index, obs in enumerate(samples):
+            plt.subplot(5, 4, 2*index +1)
+            obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2))
+            plt.imshow(obs.numpy(), interpolation='nearest')
+
+        for index, dec in enumerate(decodedSamples):
+            plt.subplot(5, 4, 2*index +2)
+            decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2))
+            plt.imshow(decoded.detach().numpy(), interpolation="nearest")
+
+        plt.show()
+
+
 
     
-

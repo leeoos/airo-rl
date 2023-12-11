@@ -1,0 +1,207 @@
+\documentclass[10pt,a4paper]{article}
+
+% Standard required packages
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,bm,mathtools,amssymb} % math packages
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{textgreek}
+\hypersetup{
+    colorlinks,
+    citecolor=black,
+    filecolor=black,
+    linkcolor=black,
+    urlcolor=black
+}
+
+
+\usepackage{xcolor}
+
+\definecolor{violet}{RGB}{148,0,211}
+\definecolor{green}{RGB}{0,128,0}
+\definecolor{red}{RGB}{255,0,0}
+\lstdefinestyle{mystyle}{
+    language=Python,
+    basicstyle=\small,
+    % basicstyle=\fontsize{7}{8}\selectfont,
+    keywordstyle=\color{violet},
+    commentstyle=\color{green},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny,
+    numbersep=5pt,
+    showstringspaces=false,
+    breaklines=true,
+    frame=leftline,
+}
+\lstset{style=mystyle}
+
+\begin{document}
+
+\begin{titlepage}
+    \begin{center}
+        \vspace*{1cm}
+        \Huge\textbf{Assignment 3}\\
+        \vspace{1.5cm}
+        \Large Author:
+        \textbf{Leonardo Colosi 1799057}\\
+        \vspace{0.5cm}
+        \Large Contributors: \textbf{Bruno Francesco Nocera 1863075, Silverio Manganaro 1817504, Simone Tozzi, 1615930, Paolo Renzi 1887793, Jacopo Tedeschi 1882789, Amine Ahardane 2050689.}
+        \vfill
+        \includegraphics[width=0.7\textwidth]{images/sapienza_logo.png}
+        \vfill
+        \vspace{0.8cm}
+        \Large \textit{MARR, RL}\\
+        \today
+    \end{center}
+\end{titlepage}
+\newpage
+
+\tableofcontents
+\newpage
+
+\section{Theory}
+\subsection{Exercise 1}
+
+\noindent Assuming $\alpha \:=\: 0.1$ and $\gamma \:=\: 0.5$, after the experience: $(s, a, r, s^{\prime}) = (1,2,3,2)$ we can compute the Q-table update for:
+\begin{enumerate}
+    \item Q-Learning 
+    \item SARSA in the case $a' \:=\: \pi_{\epsilon}(s^{\prime}) \:=\: 2$
+\end{enumerate} 
+1. In the case of Q-Learning we can proceed using the following update rule:
+\begin{equation*}
+    Q(s,a) = Q(s,a) \:+\: \alpha [ \:r \:+\: \gamma(max_{a}Q(s^{\prime},a')) \:-\: Q(s,a)]
+\end{equation*}
+So we would have:
+\begin{align*}
+    && Q(s,a) = Q(1,2) \:+\: 0.1 [ \:3 \:+\: 0.5(max_{a}Q(2,a')) \:-\: Q(1,2)] \\
+    && \\
+    &\rightarrow& Q(1,2) \:+\: 0.1 [ \:3 \:+\: 0.5(max(Q(2,1), \:Q(2,2))) \:-\: Q(1,2)] \\
+    && \\
+    &\rightarrow&2 \:+\: 0.1 [ \:3 \:+\: 0.5\cdot4 \:-\: 2] \\
+    && \\
+    &\rightarrow&2 \:+\: 0.3 = 2.3 \\
+\end{align*}
+\vspace{5pt}
+
+\noindent 2. For SARSA we use as update rule:
+\begin{equation*}
+    Q(s,a) = Q(s,a) \:+\: \alpha [ \:r \:+\: \gamma(Q(s^{\prime},a')) \:-\: Q(s,a)]
+\end{equation*}
+in this case $a'=2$, so we would have:
+\begin{align*}
+    && Q(s,a) = Q(1,2) \:+\: 0.1 [ \:3 \:+\: 0.5(Q(2,a'))\:-\: Q(1,2)] \\
+    && \\
+    &\rightarrow& Q(1,2) \:+\: 0.1 [ \:3 \:+\: 0.5(Q(2,2))\:-\: Q(1,2)] \\
+    && \\
+    &\rightarrow&2 \:+\: 0.1 [ \:3 \:+\: 0.5\cdot4 \:-\: 2) \\
+    && \\
+    &\rightarrow&2 \:+\: 0.3 = 2.3 \\
+\end{align*}
+\newpage
+
+
+
+\section{Code Implementation}
+
+\subsection{SARSA-\textlambda{}}
+In this exercise we have to resolve the \textit{"Taxi-v3"} environment from gymnasium, where the goal is to pick up the passenger from one of the colored squares and drop it off at the hotel. The problem is divided in two tasks:
+\begin{itemize}
+    \item[a.] Implementation of the $\epsilon$-greedy policy;
+    \item[b.] Implementation of SARSA-$\lambda$, which means:
+    \begin{enumerate}
+        \item update of the Q table;
+        \item update of the elegibility traces.
+    \end{enumerate}
+\end{itemize}
+\vspace{5pt}
+
+\noindent As for the first task here it is the code that choose an action with $\epsilon$-greedy strategy:
+\begin{lstlisting}
+def epsilon_greedy_action(env, Q, state, epsilon):
+    if random.uniform(0, 1) < epsilon:
+        action = env.action_space.sample()  
+    else:
+        action = argmax(Q[state])
+    return action
+\end{lstlisting}
+\vspace{5pt}
+
+\noindent Here the action is selected according to the result of a random sampling from an uniform probability distribution. If the sample value is lower than a given threshold $\epsilon$ the action will be choose randomly (\textit{exploration}) in the other case we will ches the best action accordingly to the q table (\textit{exploitation}).\\
+
+\noindent Regarding the second point, the pseudo-code given at \textit{Slide} 71, \textit{Pack} 7 can be taken as a reference for the implementation of the update mechanism for both the Q table and the elegibility traces. Here it is the code for the update:
+\begin{lstlisting}
+delta = reward + (gamma*(1-done)*Q[next_s,next_a]) - Q[s,a]
+E[s,a] += 1
+Q = Q + alpha*delta*E
+E = gamma*lambda_*E
+\end{lstlisting}
+In the first line is computed the TD error as: 
+\begin{equation}
+    \delta_t  \:=\: R_{t+1} \:+\: \gamma Q(s_{t+n}, a_{t+1}) \:-\: Q(s_t, a_t)
+\end{equation}
+then used it the update of the Q table. In the second line we add 1 to the entry of the elegibility trace relative to the current state-action pair, in order to take in account the frequency of the visits for a given state. The last two raws performs the actual update, in matrix from, of the two tables, accordingly to the update rules. In this way the learning part result much faster and the agent always reach its goal, usually taking the "safer" path.
+\newpage
+\subsection{RBF Q-Learning}
+The aim of this second practical is to implement a \textit{RBF} encoder as well as the update rule for the Q-Learning algorithm. The goal of the agent (car) is to climb the hill and reach the green flag. The characteristics of the environment are specified on the gymnasium \href{https://gymnasium.farama.org/environments/classic_control/mountain_car/}{\underline{website}}. The observation is a collection of arrays where the elements correspond to position  along the x-axis and the velocity of the car.
+ The implementation tasks are:
+\begin{itemize}
+    \item[a.] Code an RBG encoder to enhance relevant feature from the states;
+    \item[b.] Code the backward update rule for Q-Learning with elegibility traces.
+\end{itemize}
+
+\noindent For the completion of the first it is useful to take in account the implementation of RBF on provided by sklearn. The two main function of the RBF encoder are the initialization and the actual encode, in  pseudo-code:
+\begin{lstlisting}
+def initialization(env):
+    # Set up sklearn scaler function
+    scaler = sklearn.preprocessing.StandardScaler()
+    # Sampling a sequence of states to fit rbf
+    for for num_of_sample:
+        sampled_states = [env.observation_space.sample()]
+    scaler.fit(sampled_states) # scale the sampled data
+    # Set up of RBF encoder
+    num_of_features <- set_number_of_features
+    self.gamma <- initialization_of_gamma
+    encoder =  RBFSampler(gamma, num_of_features)
+    encoder.fit(self.scaler.transform(sampled_states))
+
+def encode(state):
+    # Use the rbf encoder to return the features
+    scaled_state = scaler.transform(state)
+    features = encoder.transform(scaled_state)
+    # Flatten to restore the original state dimensionality
+    return features.flatten() 
+\end{lstlisting}
+
+\noindent In the pseudo-code it can be notice how a sequence of random state is sampled from the observation space in order to "fit" the RBF encoder. This method is used to computes the parameters needed for the Radial Basis Function approximation. This involves determining the centers and widths of the RBFs based on the input data. In order to do that those data should be properly scaled, in this case this is achieved by the standard scaling function also provided by sklearn.
+
+\newpage
+\noindent For the second part of the task, the implementation of the update of the Q function (backward view) is done accordingly to the formulation provided in the \textit{Pack} 8 of the slides. In this case the Q function is approximated as a liner combination of the states features given some weights. Those weights are the one be updated: 
+\begin{lstlisting}
+def update_transition(s, action, s_prime, reward, done):
+    s_feats = feature_encoder.encode(s)
+    s_prime_feats = feature_encoder.encode(s_prime)
+    # Compute TD-Error
+    td_error = reward + gamma*(1-done)*max(Q(s_prime_feats)) - Q(s_feats)[action]
+    # Update all elegibility traces
+    traces = self.gamma*self.lambda_*traces
+    traces[action] += s_feats
+    # Update the weights
+    weights[action] += self.alpha*td_error*traces[action]
+    # Reset elegibility traces when state is terminal
+    if done: traces = zeros(self.shape)
+\end{lstlisting}
+At each update the agent learns by taking the best action accordingly to the approximation of Q, this also means allowing to going a bit backward first, in order to gain the necessary momentum to climb.
+\newpage
+
+\begin{thebibliography}{9}
+    \bibitem{texbook}
+    \emph{Reinforcement Learning, second edition: An Introduction} by \textit{Richard S. Sutton}, \textit{Andrew G. Barto}, Chapters 6.1 and 7.1 
+
+\end{thebibliography}
+
+
+\end{document}
