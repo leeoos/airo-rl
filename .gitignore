@@ -168,4 +168,5 @@ handin/
 # project
 log/
 dataset/
+clearlog.sh
 

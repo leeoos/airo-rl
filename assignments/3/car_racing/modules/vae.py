@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from os import mkdir, unlink, listdir, getpid, remove
 from os.path import join, exists
 
-LATENT = 100
+LATENT = 32
 OBS_SIZE = 64
 
 class VAE(nn.Module):

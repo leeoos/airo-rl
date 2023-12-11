@@ -23,6 +23,7 @@ from modules.vae import LATENT, OBS_SIZE
 import train.train_vae as vae_trainer
 # from modules.mdn_rnn import MDN_RNN
 
+ACTIONS = 3
 
 class Policy(nn.Module):
     continuous = True # you can change this
@@ -33,11 +34,6 @@ class Policy(nn.Module):
         # gym env
         self.env = gym.make('CarRacing-v2', continuous=self.continuous, render_mode='rgb_array')
 
-        # nn variables
-        self.latent_dim = 100
-        self.hidden_dim = 256
-        self.action_space_dim = 3
-
         # multiprocess
         self.p_queue = Queue()
         self.r_queue = Queue()
@@ -45,10 +41,8 @@ class Policy(nn.Module):
         
         # global variables
         self.device = device
-        self.batch_size = 32
-        self.num_rollout = 32*10
-        self.starting_state = True
-        self.memory = None # rnn state is empy at the beginning
+        # self.starting_state = True
+        # self.memory = None # rnn state is empy at the beginning
         self.modules_dir = './checkpoints/'
        
         # models
@@ -60,8 +54,8 @@ class Policy(nn.Module):
         # ).to(self.device)
 
         self.c = nn.Linear(
-            in_features= self.latent_dim, #+ self.hidden_dim, 
-            out_features= self.action_space_dim
+            in_features= LATENT, #+ self.hidden_dim, 
+            out_features= ACTIONS
         ).to(self.device)
 
         # utils
@@ -110,7 +104,7 @@ class Policy(nn.Module):
         """Train the entire network or just the controller module"""
 
         # set to True to retarin vae and rnn
-        train_vae = True
+        train_vae = False
         train_rnn = False
 
         if train_vae: 
@@ -133,30 +127,16 @@ class Policy(nn.Module):
             self.vae = self.load_module(VAE(img_channels=3, latent_size=LATENT), self.modules_dir).to(self.device)
         
         if train_rnn: ...
-
-            # train the rnn
-            # self.rnn = train_mdnrnn(
-            # )
         else: ...
-
-        # self.roller.rollout(
-        #     env=self.env, 
-        #     agent=self,
-        #     controller=self.c,
-        #     limit=1000,
-        #     display=True
-        # )
-        
-
 
         #################### TRAIN CONTROLLER  MULTITHRED ########################
         ##########################################################################
-        train_controller = True# set to True to retarin controller
+        train_controller = True # set to True to retarin controller
 
         if train_controller:
             pop_size = 4
             n_samples = 4 # 1 for signle thread
-            num_workers = 8
+            num_workers = 16
 
             ### START THREDS ###
 
@@ -185,23 +165,30 @@ class Policy(nn.Module):
             es = cma.CMAEvolutionStrategy(flat_params, 0.1, {'popsize':pop_size})
 
             # sleep(10.)
-            # self.p_queue.put(('test', 'test'))
-            # self.slave_routine(self.p_queue, self.r_queue, self.e_queue, p_index, tmp_dir)
-            # i = 0
-            # while True:
-            #     self.p_queue.put((0, 0))
-            #     print(i)
-            #     sleep(2.)
-            #     i += 1
-            #     if i >+ 10 : break
+            # generations = 0
+            # while not es.stop():
+            #     print("Generation: ", generations)
+            #     r_list = [0] * pop_size  # result list
+            #     solutions = es.ask()
+            #     for s_id, s in enumerate(solutions):
+            #         for _ in range(n_samples):
+            #             self.p_queue.put((s_id, s))
+            #     print('Pqueue : ', self.p_queue.qsize())
 
+            #     while self.r_queue.empty():
+            #         sleep(.1)
+            #     print('Rqueue : ', self.r_queue.qsize())
+            #     sleep(2.)
+            #     generations += 1
+            #     if generations >= 10 : break
+            
 
             # define current best and load parameters
             cur_best = None
             ctrl_file = self.modules_dir+'controller.pt'
             print("Attempting to load previous best...")
             if exists(ctrl_file):
-                state = torch.load(ctrl_file, map_location={'cuda:0': 'cpu'})
+                state = torch.load(ctrl_file, map_location=self.device)
                 cur_best = - state['reward']
                 self.c.load_state_dict(state['state_dict'])
                 print("Previous best was {}...".format(-cur_best))
@@ -211,9 +198,9 @@ class Policy(nn.Module):
             display = True
             cur_best = None
             target_return = 50 #950
-
+            
             print("Wating for threds to start... ")
-            sleep(100.)
+            # sleep(100.)
             print("Starting CMA training")
             while not es.stop() and epoch <= 5:
 
@@ -235,10 +222,11 @@ class Policy(nn.Module):
 
                 for _ in range(pop_size * n_samples):
 
+                    # ctrl = 0
                     while self.r_queue.empty():
-                        ...
-                        # sleep(1.)
+                        sleep(1.)
 
+                    # print('R queue : ', self.r_queue.qsize())
                     r_s_id, r = self.r_queue.get()
                     r_list[r_s_id] += r / n_samples
 
@@ -248,12 +236,11 @@ class Policy(nn.Module):
                 if display:
                     pbar.close()
 
-                # print('queue: ', p_queue.qsize())
                 es.tell(solutions, r_list)
-                es.disp()
+                # es.disp()
 
                 # evaluation and saving
-                if epoch % log_step == log_step - 1:
+                if  epoch % log_step == log_step - 1:
 
                     # print("copy of r_queue: ", c_queue.qsize())
                     # best_params, best = self.evaluate(solutions, r_list, p_queue=cp_queue, r_queue=c_queue)
@@ -283,10 +270,11 @@ class Policy(nn.Module):
                         break
                 epoch += 1
                 print("End of epoch: ", epoch)
+                if epoch >= 1:break
 
-        self.e_queue.put('EOP')
-        for p in list_of_process:
-            p.terminate()
+            self.e_queue.put('EOP')
+            for p in list_of_process:
+                p.terminate()
         return
     ##########################################################################
   
@@ -295,16 +283,24 @@ class Policy(nn.Module):
         # redirect streams
         sys.stdout = open(join(tmp_dir, str(getpid()) + '.out'), 'a')
         sys.stderr = open(join(tmp_dir, str(getpid()) + '.err'), 'a')
-
+        
         with torch.no_grad():
+            roller = Rollout()
+
+            with open('foo', 'a') as f: f.write('e: '+str(self.e_queue.qsize())+'\n')
             while self.e_queue.empty():
                 if self.p_queue.empty():
-                    print("Sleeping")
-                    sleep(1.)
+                    ...
                 else:
-                    print("Working")
+                    with open('foo', 'a') as f: f.write('p: '+str(self.p_queue.qsize())+'\n')
                     s_id, params = self.p_queue.get()
-                    self.r_queue.put((s_id, self.roller.rollout(self.env, self, self.c, params, display=True)))
+                    # self.r_queue.put((s_id, self.roller.rollout(self.env, self, self.c, params))
+                    value = roller.rollout(self.vae, self.c, params, device=self.device)
+                    # value = self.roller.sasso()
+                    with open('foo', 'a') as f: f.write('v: '+str(value)+'\n')
+                    # value = 42
+                    self.r_queue.put((s_id, value))
+                    with open('foo', 'a') as f: f.write('r: '+str(self.r_queue.qsize())+'\n')
             print("End of my life")
 
 

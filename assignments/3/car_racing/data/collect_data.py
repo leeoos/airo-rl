@@ -24,12 +24,6 @@ def random_rollout(rollouts, data_dir):
     env = gym.make('CarRacing-v2', continuous=True, render_mode='human')
     seq_len = 1500
 
-    if not exists(data_dir): 
-        mkdir(data_dir)
-    else:
-        remove(data_dir+'/observations.pt')
-        remove(data_dir+'/actions.pt')
-
     rollout_obs = []
     rollout_actions = []
 
@@ -64,8 +58,8 @@ def random_rollout(rollouts, data_dir):
     rollout_actions = torch.stack(rollout_actions, dim=0)
     
     # save data on a file
-    torch.save(rollout_obs, data_dir+'/observations.pt')
-    torch.save(rollout_actions, data_dir+'/actions.pt')
+    torch.save(rollout_obs, data_dir+'observations.pt')
+    torch.save(rollout_actions, data_dir+'actions.pt')
 
 
 if __name__ == "__main__":
@@ -75,11 +69,20 @@ if __name__ == "__main__":
     parser.add_argument('--dir', type=str, help="Where to place rollouts")
     args = parser.parse_args()
 
+    rollouts = args.rollouts if args.rollouts else 1
+
+    data_dir = ''
     if args.dir:
         data_dir = args.dir 
     else:
-        print("Error: no data")
+        print("Error: no destination provided")
         exit(1)
 
+    if not exists(data_dir): 
+        mkdir(data_dir)
+    else:
+        if exists(data_dir+'observations.pt') : remove(data_dir+'observations.pt')
+        if exists(data_dir+'actions.pt') : remove(data_dir+'actions.pt')
+
     # execute random rollouts to collect datas
-    random_rollout(args.rollouts, args.dir)
+    random_rollout(rollouts, data_dir)
