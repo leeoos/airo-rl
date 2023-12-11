@@ -65,16 +65,7 @@ def loss_function(recon_x, x, mu, logsigma):
     MSE = F.mse_loss(recon_x, x, reduction='sum')
     KLD = -0.5 * torch.sum(1 + 2 * logsigma - mu.pow(2) - (2 * logsigma).exp())
     return MSE + KLD
-
-
-def load_module(model, model_dir):
-    if exists(model_dir+model.name.lower()+'.pt'):
-        print("Loading model "+model.name+" state parameters")
-        model.load(model_dir)
-        return model
-    else:
-        print("Error no model "+model.name.lower()+" found!")
-        exit(1)
+    
 
 if __name__ == "__main__":
 
@@ -112,7 +103,7 @@ if __name__ == "__main__":
 
         if not args.train:
             modules_dir = '../checkpoints/'
-            vae_model = load_module(vae_model, modules_dir)
+            vae_model = vae_model.load(modules_dir).to(device)
 
         env = gym.make('CarRacing-v2', continuous=False, render_mode='rgb_array')
         _, _ = env.reset()
