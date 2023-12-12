@@ -7,19 +7,21 @@ from os import mkdir, unlink, listdir, getpid, remove
 from os.path import join, exists
 
 ACTIONS = 4
+CONTINUOUS = 3
 
-class Controller(nn.Module):
+class Continuous(nn.Module):
     """ Controller """
 
     def __init__(self):
         super().__init__()
 
-        self.name = 'CONTROLLER'
+        self.name = 'CONTINUOUS'
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        # discrete
-        self.fc = nn.Linear(LATENT, ACTIONS)
+        # continuous
+        self.fc= nn.Linear(LATENT, CONTINUOUS)
         self.th = nn.Tanh()
+
 
     def forward(self, c_in):
         out = self.fc(c_in)

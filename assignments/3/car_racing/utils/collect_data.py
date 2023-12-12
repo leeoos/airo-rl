@@ -17,7 +17,8 @@ def sample_continuous_actions(action_space, seq_len, dt):
             daction_dt = np.random.randn(*actions[-1].shape)
             actions.append(
                 np.clip(actions[-1] + math.sqrt(dt) * daction_dt,
-                        action_space.low, action_space.high))
+                        action_space.low, action_space.high)
+            )
         return actions
 
 def random_rollout(rollouts, continuous, render, data_dir): 
@@ -31,8 +32,8 @@ def random_rollout(rollouts, continuous, render, data_dir):
 
     for i in range(rollouts):
         env.reset()
-
         action_list = []
+
         if continuous: 
             action_list = sample_continuous_actions(env.action_space, seq_len, 1. / 50)
 
@@ -66,12 +67,12 @@ def random_rollout(rollouts, continuous, render, data_dir):
     # convert observatons to a single torch tensor and save on pt file
     rollout_obs = torch.stack(rollout_obs, dim=0)
     rollout_obs = rollout_obs.permute(0,1,3,2).permute(0,2,1,3)
-    torch.save(rollout_obs, data_dir+'observations.pt')
+    # torch.save(rollout_obs, data_dir+'observations.pt')
 
     # same for actions if continuous
     if continuous:
         rollout_actions = torch.stack(rollout_actions, dim=0)
-        torch.save(rollout_actions, data_dir+'actions.pt')
+        # torch.save(rollout_actions, data_dir+'actions.pt')
 
 
 if __name__ == "__main__":
@@ -84,7 +85,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     rollouts = args.rollouts if args.rollouts else 1
-    data_dir = args.dir if args.dir else './dataset/'
+    data_dir = args.dir if args.dir else '../dataset/'
 
     if not exists(data_dir): 
         mkdir(data_dir)

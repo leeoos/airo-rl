@@ -170,4 +170,5 @@ log/
 dataset/
 clearlog.sh
 bar.py
+foo
 

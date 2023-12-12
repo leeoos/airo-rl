@@ -62,9 +62,11 @@ def train_vae(model,
 
 def loss_function(recon_x, x, mu, logsigma):
     """ VAE loss function """
+    bce_loss = torch.nn.BCEWithLogitsLoss(reduction='sum')
+    BCE = bce_loss(recon_x, x)  
     MSE = F.mse_loss(recon_x, x, reduction='sum')
     KLD = -0.5 * torch.sum(1 + 2 * logsigma - mu.pow(2) - (2 * logsigma).exp())
-    return MSE + KLD
+    return BCE + KLD
     
 
 if __name__ == "__main__":
@@ -104,6 +106,7 @@ if __name__ == "__main__":
         if not args.train:
             modules_dir = '../checkpoints/'
             vae_model = vae_model.load(modules_dir).to(device)
+
 
         env = gym.make('CarRacing-v2', continuous=False, render_mode='rgb_array')
         _, _ = env.reset()
