@@ -4,9 +4,18 @@ import numpy as np
 from student import Policy
 import gymnasium as gym
 
+import torch
+from modules.vae import VAE 
+from modules.controller import Controller
+
 def evaluate(env=None, n_episodes=1, render=False):
     agent = Policy()
     agent.load()
+
+    # agent.vae.load('./checkpoints/')
+    # c_checkpoint = './checkpoints/controller.pt'
+    # state = torch.load(c_checkpoint)
+    # agent.c.load_state_dict(state['state_dict'])
 
     env = gym.make('CarRacing-v2', continuous=agent.continuous)
     if render:

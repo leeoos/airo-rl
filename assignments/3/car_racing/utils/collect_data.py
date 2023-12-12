@@ -52,13 +52,10 @@ def random_rollout(rollouts, continuous, render, data_dir):
                 # select a random action except do nothing 
                 action = int(np.random.rand()*3 + 1) 
                 
-    
             t += 1
             observation, reward, terminated, truncated, info = env.step(action)
-
             observation = torch.from_numpy(observation).float() / 255
             rollout_obs.append(observation)
-
 
             done = terminated #or truncated
 

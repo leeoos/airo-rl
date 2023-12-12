@@ -25,23 +25,12 @@ class Rollout():
             idx += e_p.numel()
         return unflattened
     
-    # this function is here just to test cma parametrs 
-    # def get_action(self, state, vae, controller, device):
-    #     state = torch.tensor(state/255, dtype=torch.float)
-    #     state = state.unsqueeze(0).to(device)
-       
-    #     mu, logvar = vae.encode(state.float())
-    #     z = vae.latent(mu, logvar)
-    #     a = controller(z).to(device)
 
-    #     torch.clip(a, min = -1, max = 1 )
-    #     return a.cpu().float().squeeze().detach().numpy()
-
-    def rollout(self, agent, params=None, limit=1100, device='cpu', render=False):
+    def rollout(self, agent, params=None, limit=1000, device='cpu', render=False):
         """ Execute a rollout and returns minus cumulative reward. """
 
         render_mode = 'human' if render else 'rgb_array'
-        self.env = gym.make('CarRacing-v2', continuous=True, render_mode=render_mode)
+        self.env = gym.make('CarRacing-v2', continuous=False, render_mode=render_mode)
 
         if params is not None:
             params = self.unflatten_parameters(params, agent.c.parameters(), device)
@@ -61,12 +50,24 @@ class Rollout():
         done = False
 
         for _ in range(limit):
-            action = agent.act(obs) #self.get_action(obs, vae, controller, device) 
+            action = agent.act(obs) 
             obs, reward, terminated, truncated, _ = self.env.step(action)
                 
             done = terminated 
             if done: break
 
-            cumulative += reward
-        return (-cumulative)
+            cumulative += reward # 50 100 -50
+
+        return (200 - cumulative) # 950 900 1050 
+    
+    # if cum > 1000 --> res: negativo (piccolo) --> non fare niente
+    # if cum < -1000 --> res: positivo (grande) --> minimizza
+
+    # best: negativo (piccolo) -->  cur_best > best --> aggiorna cur_best
+    # best: positivo (grande) --> cur_best 
+
+
+    # - (950 - cum) >= 0
+    
+    # cum >= 950
 

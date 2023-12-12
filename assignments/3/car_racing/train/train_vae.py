@@ -54,14 +54,14 @@ def train_vae(model,
         if (epoch + 1) % 10 == 0:
             print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
 
-    if save_dir: model.save(save_dir)
+    if save_dir: 
+        print("Saving model ...")
+        model.save(save_dir)
     return model
 
 
 def loss_function(recon_x, x, mu, logsigma):
     """ VAE loss function """
-    # CE = F.cross_entropy(recon_x, x)
-    # CE = F.cross_entropy(recon_x, x, reduction='sum')
     MSE = F.mse_loss(recon_x, x, reduction='sum')
     KLD = -0.5 * torch.sum(1 + 2 * logsigma - mu.pow(2) - (2 * logsigma).exp())
     return MSE + KLD

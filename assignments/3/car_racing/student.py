@@ -16,17 +16,18 @@ import gymnasium as gym
 import numpy as np
 import cma
 
+from modules.controller import Controller
+from modules.controller import ACTIONS
 from modules.vae import VAE 
-from utils.rollout import Rollout
 from modules.vae import LATENT, OBS_SIZE
 import train.train_vae as vae_trainer
+from utils.rollout import Rollout
 # from modules.mdn_rnn import MDN_RNN
 
-ACTIONS = 3
 
 class Policy(nn.Module):
     
-    continuous = True # you can change this
+    continuous = False # you can change this
 
     def __init__(self, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')):
         super(Policy, self).__init__()
@@ -41,18 +42,12 @@ class Policy(nn.Module):
        
         # models
         self.vae = VAE().to(self.device)
-        
-        # self.rnn = MDN_RNN(
-        #     input_size = self.latent_dim + self.action_space_dim, 
-        #     output_size = self.latent_dim + self.action_space_dim
-        # ).to(self.device)
-        # self.starting_state = True
-        # self.memory = None # rnn state is empy at the beginning
+        self.c = Controller().to(self.device)
 
-        self.c = nn.Linear(
-            in_features= LATENT, #+ self.hidden_dim, 
-            out_features= ACTIONS
-        ).to(self.device)
+        # self.c = nn.Linear(
+        #     in_features= LATENT, #+ self.hidden_dim, 
+        #     out_features= ACTIONS
+        # ).to(self.device)
 
         # utils
         self.roller = Rollout()
@@ -68,15 +63,11 @@ class Policy(nn.Module):
         mu, logvar = self.vae.encode(state.float())
         z = self.vae.latent(mu, logvar)
         
-        # c_in, z, h = ...
-        a = self.c(z).to(self.device)
+        a = self.c(z).to(self.device)        
+        # torch.clip(a, min = -1, max = 1 )
+        # return a.cpu().float().squeeze().detach().numpy()
 
-        # rnn_in = torch.concat((a, z), dim=1).to(self.device)
-        # _, hidden = self.rnn.forward_lstm(rnn_in) # lstm outputs: out, (h_n, c_n)
-        # self.memory = hidden[0].squeeze(0).to(self.device)
-        
-        torch.clip(a, min = -1, max = 1 )
-        return a.cpu().float().squeeze().detach().numpy()
+        return (int(torch.argmax(a)) + 1)
 
     def train(self):
         """Train the entire network or just the controller module"""
@@ -143,24 +134,20 @@ class Policy(nn.Module):
             plt.close()
             ####DEGUB####
 
-        
-        if train_rnn: ...
-        else: ...
-
         ########################### TRAIN CONTROLLER  ############################
         ##########################################################################
 
-        # ####DEGUB####
+        ####DEGUB####
         # for p in self.c.parameters():
         #     print('previous parameters: {}'.format(p))
         #     break
-        # ####DEGUB####
+        ####DEGUB####
 
         # training parameters
-        pop_size = 4
-        n_samples = 4 
+        pop_size = 3
+        n_samples = 2 
         generation = 0
-        target_return = 200 #950
+        target_return = 700
 
         # log variables
         log_step = 3 # print log each n steps
@@ -174,12 +161,27 @@ class Policy(nn.Module):
         if exists(c_checkpoint):
             state = torch.load(c_checkpoint, map_location=self.device)
             cur_best = - state['reward']
-            self.c.load_state_dict(state['state_dict'])
+            # self.c.load_state_dict(state['state_dict'])
             print("Previous best was {}...".format(-cur_best))
+
+        ####DEGUB####
+        # for p in self.c.parameters():
+        #     print('previous parameters: {}'.format(p))
+        #     break
+        ####DEGUB####
+
+    
+        # opts = cma.CMAOptions()
+        # opts.set('tolfun', 1e-12)
+        # opts['tolx'] = 1e-11
 
         params = self.c.parameters()
         flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
-        es = cma.CMAEvolutionStrategy(flat_params, 0.1, {'popsize':pop_size})
+        es = cma.CMAEvolutionStrategy(
+            flat_params, 
+            0.2, 
+            {'popsize':pop_size}
+        )
 
         print("Starting CMA training")
         start_time = time.time()
@@ -207,34 +209,39 @@ class Policy(nn.Module):
             es.disp()
 
             # evaluation and saving
-            if  generation % log_step == log_step - 1:
+            if  generation % log_step == log_step - 1: render = True
 
-                # render = True
-                best_params, best = self.evaluate(solutions, r_list, render)
-                print("Current evaluation: {}".format(-best))
+            
+            best_params, best = self.evaluate(solutions, r_list, render)
+            print("Minus Current evaluation: {}".format(-best)) # -950 -900 -1050
+            print("Plus Current evaluation: {}".format(best)) # 950 900 1050
 
-                if not cur_best or cur_best > best:
-                    cur_best = best
-                    print("Saving new best with value {}...".format(-cur_best))
-        
-                    # load parameters into controller
-                    for p, p_0 in zip(self.c.parameters(), best_params):
-                        p.data.copy_(p_0)
+            if not cur_best or cur_best > best: # 950 900 900
+                cur_best = best
 
-                    torch.save(
-                        {
-                            'epoch': generation,
-                            'reward': - cur_best,
-                            'state_dict': self.c.state_dict()
-                        },
-                        c_checkpoint
-                    )
+                print("Saving new best with value {}...".format(-cur_best))
+    
+                # load parameters into controller
+                for p, p_0 in zip(self.c.parameters(), best_params):
+                    p.data.copy_(p_0)
 
-                print("--- %s seconds since start training ---" % (time.time() - start_time)) 
+                torch.save(
+                    {
+                        'epoch': generation,
+                        'reward': - cur_best,
+                        'state_dict': self.c.state_dict()
+                    },
+                    c_checkpoint
+                )
+                self.save()
+                self.evaluate(solutions, r_list, render=True, roll=3)
 
-                if - cur_best > target_return:
-                    print("Terminating controller training with value {}...".format(-cur_best))
-                    break
+            # print("--- {} minutes since start training ---".format((time.time() - start_time)//60))
+            # print("best {}".format(best))
+            # print("cur best {}".format(cur_best))
+            if - cur_best <= 0: #target_return:
+                print("Terminating controller training with value {}...".format(-cur_best))
+                break
 
             generation += 1
             render = False
@@ -243,12 +250,22 @@ class Policy(nn.Module):
         return
     
     
-    def evaluate(self, solutions, results, render):
+    def evaluate(self, solutions, results, render, roll=6):
         print("Evaluating...")
         index_min = np.argmin(results)
         best_guess = solutions[index_min]
-        value = self.roller.rollout(self, best_guess, device=self.device, render=render)
-        return best_guess, value
+        restimates = []
+
+        p_list = []
+        for s_id in range(roll):
+            p_list.append((s_id, best_guess))
+
+        for _ in tqdm(range(roll)):
+            value = self.roller.rollout(self, best_guess, device=self.device, render=render)
+            restimates.append(value)
+
+        
+        return best_guess, np.mean(restimates)
     
     ##########################################################################
     
