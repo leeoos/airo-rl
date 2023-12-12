@@ -92,25 +92,6 @@ class Policy(nn.Module):
                 save_dir=False
             ).to(self.device)
 
-            ####DEGUB####
-            X = torch.load(self.data_dir+'observations.pt').to(self.device)
-            samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
-            decodedSamples, _, _ = self.vae.forward(samples)
-            
-            for index, obs in enumerate(samples):
-                plt.subplot(5, 4, 2*index +1)
-                obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2)).cpu()
-                plt.imshow(obs.numpy(), interpolation='nearest')
-
-            for index, dec in enumerate(decodedSamples):
-                plt.subplot(5, 4, 2*index +2)
-                decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2)).cpu()
-                plt.imshow(decoded.detach().numpy(), interpolation="nearest")
-
-            plt.show()
-            sleep(2.)
-            plt.close()
-            ####DEGUB####
         else:
             self.vae = self.vae.load(self.modules_dir).to(self.device)
 
@@ -137,17 +118,17 @@ class Policy(nn.Module):
         ########################### TRAIN CONTROLLER  ############################
         ##########################################################################
 
-        ####DEGUB####
-        # for p in self.c.parameters():
-        #     print('previous parameters: {}'.format(p))
-        #     break
-        ####DEGUB####
+        ###DEGUB####
+        for p in self.c.parameters():
+            print('previous parameters: {}'.format(p))
+            break
+        ###DEGUB####
 
         # training parameters
         pop_size = 3
         n_samples = 2 
         generation = 0
-        target_return = 700
+        target_return = 1000
 
         # log variables
         log_step = 3 # print log each n steps
@@ -155,25 +136,21 @@ class Policy(nn.Module):
         render = False
         
         # define current best and load parameters
-        cur_best = None
-        c_checkpoint = self.modules_dir+'controller.pt'
+        cur_best = 100000000000 # max cap
+
         print("Attempting to load previous best...")
-        if exists(c_checkpoint):
-            state = torch.load(c_checkpoint, map_location=self.device)
-            cur_best = - state['reward']
-            # self.c.load_state_dict(state['state_dict'])
+        if exists(self.modules_dir+'controller.pt') and exists(self.modules_dir+'cur_best.bk'):
+            # state = torch.load(c_checkpoint, map_location=self.device)
+            with open(self.modules_dir+'cur_best.bk', 'r') as f : 
+                for i in f : cur_best = float(i)
+            self.c = self.c.load(self.modules_dir)
             print("Previous best was {}...".format(-cur_best))
 
         ####DEGUB####
-        # for p in self.c.parameters():
-        #     print('previous parameters: {}'.format(p))
-        #     break
+        for p in self.c.parameters():
+            print('previous parameters: {}'.format(p))
+            break
         ####DEGUB####
-
-    
-        # opts = cma.CMAOptions()
-        # opts.set('tolfun', 1e-12)
-        # opts['tolx'] = 1e-11
 
         params = self.c.parameters()
         flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
@@ -184,6 +161,7 @@ class Policy(nn.Module):
         )
 
         print("Starting CMA training")
+        print("Generation {}".format(generation+1))
         start_time = time.time()
 
         while not es.stop(): # and generation < 20:
@@ -211,46 +189,50 @@ class Policy(nn.Module):
             # evaluation and saving
             if  generation % log_step == log_step - 1: render = True
 
-            
-            best_params, best = self.evaluate(solutions, r_list, render)
-            print("Minus Current evaluation: {}".format(-best)) # -950 -900 -1050
-            print("Plus Current evaluation: {}".format(best)) # 950 900 1050
+            best_params, best = self.evaluate(solutions, r_list)
+            print("Current evaluation: {}".format(- best)) # -950 -900 -1050
+            # print("Plus Current evaluation: {}".format(best)) # 950 900 1050
+
+            # print("OLD Minus Saving new best with value {}...".format(- cur_best))
+            # print("OLD Plus Saving new best with value {}...".format(cur_best))
 
             if not cur_best or cur_best > best: # 950 900 900
                 cur_best = best
 
-                print("Saving new best with value {}...".format(-cur_best))
+                print("Saving new best with value {}...".format(- cur_best))
+                # print("NEW Plus Saving new best with value {}...".format(cur_best))
     
                 # load parameters into controller
                 for p, p_0 in zip(self.c.parameters(), best_params):
                     p.data.copy_(p_0)
 
-                torch.save(
-                    {
-                        'epoch': generation,
-                        'reward': - cur_best,
-                        'state_dict': self.c.state_dict()
-                    },
-                    c_checkpoint
-                )
+                self.c.save(self.modules_dir)
+                # torch.save(
+                #     {
+                #         'epoch': generation,
+                #         'reward': - cur_best,
+                #         'state_dict': self.c.state_dict()
+                #     },
+                #     c_checkpoint
+                # )
+                with open(self.modules_dir+'cur_best.bk', 'w') as f: f.write(str(cur_best))
                 self.save()
                 self.evaluate(solutions, r_list, render=True, roll=3)
 
             # print("--- {} minutes since start training ---".format((time.time() - start_time)//60))
             # print("best {}".format(best))
-            # print("cur best {}".format(cur_best))
-            if - cur_best <= 0: #target_return:
-                print("Terminating controller training with value {}...".format(-cur_best))
+            if - best > target_return: #target_return:
+                # print("cur best {}".format(- cur_best))
+                print("Terminating controller training with value {}...".format(- cur_best))
                 break
 
             generation += 1
-            render = False
-            print("End of generation: ", generation)
+            print("Generation {}".format(generation+1))
             
         return
     
     
-    def evaluate(self, solutions, results, render, roll=6):
+    def evaluate(self, solutions, results, render=False, roll=6):
         print("Evaluating...")
         index_min = np.argmin(results)
         best_guess = solutions[index_min]

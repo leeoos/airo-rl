@@ -12,7 +12,7 @@ def evaluate(env=None, n_episodes=1, render=False):
     agent = Policy()
     agent.load()
 
-    # agent.vae.load('./checkpoints/')
+    # agent.vae = agent.vae.load('./checkpoints/')
     # c_checkpoint = './checkpoints/controller.pt'
     # state = torch.load(c_checkpoint)
     # agent.c.load_state_dict(state['state_dict'])

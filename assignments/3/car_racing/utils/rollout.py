@@ -58,7 +58,9 @@ class Rollout():
 
             cumulative += reward # 50 100 -50
 
-        return (200 - cumulative) # 950 900 1050 
+        # print("cumulative: {}".format(cumulative))
+        cumulative += 1000
+        return (- cumulative) # 950 900 1050 
     
     # if cum > 1000 --> res: negativo (piccolo) --> non fare niente
     # if cum < -1000 --> res: positivo (grande) --> minimizza
