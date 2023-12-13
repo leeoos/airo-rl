@@ -61,10 +61,10 @@ class Policy(nn.Module):
         self.roller = Rollout()
 
         # cma training parameters
-        self.pop_size = 6
-        self.n_samples = 2 
+        self.pop_size = 2
+        self.n_samples = 1 
         self.temperature = 1000
-        self.target_return = 950 
+        self.target_return = -4
 
   
     def act(self, state):
@@ -138,6 +138,35 @@ class Policy(nn.Module):
 ############################ TRAIN CONTROLLER ###############################
 #############################################################################
 
+        train_c = False
+        if not train_c:
+            go = 0 
+            ####DEGUB####
+            for p in self.c.parameters():
+                print('previous parameters: {}'.format(p))
+                go += 1
+                if go == 3 :break
+            ####DEGUB####
+            self.c = self.c.load(self.modules_dir)
+            params = self.c.parameters()
+            go = 0 
+            ####DEGUB####
+            for p in self.c.parameters():
+                print('previous parameters: {}'.format(p))
+                go += 1
+                if go == 3 :break
+            ####DEGUB####
+            flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
+            self.roller.rollout( 
+                                self, 
+                                flat_params, 
+                                device=self.device,
+                                continuous=self.continuous,
+                                temperature=self.temperature,
+                                render=True
+                                )
+            return
+
         # log variables for cma controller
         log_step = 3 # print log each n steps
         display = True
@@ -155,6 +184,7 @@ class Policy(nn.Module):
 
             # load previous model
             # print("Previous best was {}...".format(-cur_best))
+            print("Previous controller loaded")
             self.c = self.c.load(self.modules_dir)
 
         params = self.c.parameters()
@@ -196,7 +226,7 @@ class Policy(nn.Module):
 
             # evaluation and saving
             print("Evaluating...")
-            best_params, best, cur_mean = self.evaluate(solutions, r_list)
+            best_params, best, cur_mean = self.evaluate(solutions, r_list, run=2)
             print("Current evaluation: {}".format(- best)) 
             print("Current mean reward: {}".format(cur_mean)) 
 
@@ -206,7 +236,8 @@ class Policy(nn.Module):
                 print("Saving new best with value {}...".format(-cur_best))
     
                 # load parameters into controller
-                for p, p_0 in zip(self.c.parameters(), best_params):
+                unflat_best_params = self.roller.unflatten_parameters(best_params, self.c.parameters(), self.device)
+                for p, p_0 in zip(self.c.parameters(), unflat_best_params):
                     p.data.copy_(p_0)
 
                 # saving
@@ -216,11 +247,29 @@ class Policy(nn.Module):
                 #     f.write(str(dump))
                 self.save()
 
+                # ####DEGUB####
+                # go = 0
+                # for p in best_params:
+                #     print('best_params parameters: {}'.format(p))
+                #     go += 1
+                #     if go == 3 :break
+                # ####DEGUB####
+
+                # go = 0 
+                # ####DEGUB####
+                # for p in self.c.parameters():
+                #     print('previous parameters: {}'.format(p))
+                #     go += 1
+                #     if go == 3 :break
+                # ####DEGUB####
+
+                
+
                 print("Rendering...")
-                self.evaluate(solutions, r_list, render=True, run=3)
+                # self.evaluate(solutions, r_list, render=True, run=3)
 
             # if - best > self.target_return: #target_return:
-            if  cur_mean >= 50: #target_return:
+            if  cur_mean >= 10: #-1000: #target_return:
                 print("Terminating controller training with value {}...".format(-cur_best))
                 break
 

@@ -8,14 +8,13 @@ import gymnasium as gym
 from tqdm import tqdm
 from time import sleep
 
-from modules.vae import LATENT, OBS_SIZE
 
 class Rollout():
 
     def __init__(self):
         pass
 
-    # ctallec function:
+    # ctallec functions:
     def unflatten_parameters(self, params, example, device):
         """ Unflatten parameters. Note: example is generator of parameters (module.parameters()), used to reshape params """
         
@@ -26,6 +25,19 @@ class Rollout():
             unflattened += [params[idx:idx + e_p.numel()].view(e_p.size())]
             idx += e_p.numel()
         return unflattened
+    
+
+    # def load_parameters(self, params, controller):
+    #     """ Load flattened parameters into controller.
+
+    #     :args params: parameters as a single 1D np array
+    #     :args controller: module in which params is loaded
+    #     """
+    #     proto = next(controller.parameters())
+    #     params = self.unflatten_parameters(params, controller.parameters(), proto.device)
+
+    #     for p, p_0 in zip(controller.parameters(), params):
+    #         p.data.copy_(p_0)
     
 
     def rollout(self, 
@@ -71,7 +83,7 @@ class Rollout():
         self.env.reset()
         
         # print("cumulative: {}".format(cumulative))
-        cumulative += temperature # reward "temperature"
-        return (- cumulative),  cumulative# 950 900 1050 
+        weighted_reward = cumulative + temperature # reward "temperature"
+        return (- weighted_reward),  cumulative# 950 900 1050 
     
 
