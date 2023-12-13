@@ -31,7 +31,7 @@ import train.train_vae as vae_trainer
 
 class Policy(nn.Module):
     
-    continuous = False 
+    continuous = True
 
     def __init__(self, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')):
         super(Policy, self).__init__()
@@ -92,7 +92,6 @@ class Policy(nn.Module):
         train_rnn = False
 
         if train_vae: 
-
             if not exists(self.data_dir):
                 print("Error: no data")
                 exit(1)
@@ -111,64 +110,45 @@ class Policy(nn.Module):
             self.vae = self.vae.load(self.modules_dir).to(self.device)
 
             ####DEGUB####
-            X = torch.load(self.data_dir+'observations.pt').to(self.device)
-            samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
-            decodedSamples, _, _ = self.vae.forward(samples)
+            self.vae = self.vae.load('./foo/').to(self.device)
+            # # self.vae = torch.load('./foo/vae.pt', map_location=torch.device(self.device))
+            # X = torch.load(self.data_dir+'observations.pt').to(self.device)
+            # samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
+            # decodedSamples, _, _ = self.vae.forward(samples)
             
-            for index, obs in enumerate(samples):
-                plt.subplot(5, 4, 2*index +1)
-                obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2)).cpu()
-                plt.imshow(obs.numpy(), interpolation='nearest')
+            # for index, obs in enumerate(samples):
+            #     plt.subplot(5, 4, 2*index +1)
+            #     obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2)).cpu()
+            #     plt.imshow(obs.numpy(), interpolation='nearest')
 
-            for index, dec in enumerate(decodedSamples):
-                plt.subplot(5, 4, 2*index +2)
-                decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2)).cpu()
-                plt.imshow(decoded.detach().numpy(), interpolation="nearest")
+            # for index, dec in enumerate(decodedSamples):
+            #     plt.subplot(5, 4, 2*index +2)
+            #     decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2)).cpu()
+            #     plt.imshow(decoded.detach().numpy(), interpolation="nearest")
 
-            plt.show()
-            sleep(2.)
-            plt.close()
-            ####DEGUB####
-
-            self.vae = torch.load('./foo/vae.pt', map_location=torch.device(self.device))
-            ####DEGUB####
-            X = torch.load(self.data_dir+'observations.pt').to(self.device)
-            samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
-            decodedSamples, _, _ = self.vae.forward(samples)
-            
-            for index, obs in enumerate(samples):
-                plt.subplot(5, 4, 2*index +1)
-                obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2)).cpu()
-                plt.imshow(obs.numpy(), interpolation='nearest')
-
-            for index, dec in enumerate(decodedSamples):
-                plt.subplot(5, 4, 2*index +2)
-                decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2)).cpu()
-                plt.imshow(decoded.detach().numpy(), interpolation="nearest")
-
-            plt.show()
-            sleep(2.)
-            plt.close()
+            # plt.show()
+            # sleep(2.)
+            # plt.close()
             ####DEGUB####
 
 ############################ TRAIN CONTROLLER ###############################
 #############################################################################
-
 
         # log variables for cma controller
         log_step = 3 # print log each n steps
         display = True
         generation = 0
         
-        # define current best and load parameters
+        print("Attempting to load previous best...")
+       
+        # define current best as max
         cur_best = 100000000000 # max cap
 
-        print("Attempting to load previous best...")
-
-        if exists(self.modules_dir+'controller.pt') and exists(self.modules_dir+'cur_best.bk'):
+        file_name = 'controller.pt' if not self.continuous else 'continuous.pt'
+        if exists(self.modules_dir+file_name) and exists(self.modules_dir+file_name):
             with open(self.modules_dir+'cur_best.bk', 'r') as f : 
-                for i in f : cur_best = float(i) + self.temperature
-            
+                for i in f : cur_best = float(i) 
+
             # load previous model
             print("Previous best was {}...".format(-cur_best))
             self.c = self.c.load(self.modules_dir)
@@ -226,13 +206,12 @@ class Policy(nn.Module):
                 # saving
                 self.c.save(self.modules_dir)
                 with open(self.modules_dir+'cur_best.bk', 'w') as f: 
-                    dump = -cur_best - self.temperature
+                    dump = cur_best 
                     f.write(str(dump))
                 self.save()
 
-                if  generation % log_step == log_step - 1:
-                    print("Rendering...")
-                    self.evaluate(solutions, r_list, render=True, run=3)
+                print("Rendering...")
+                self.evaluate(solutions, r_list, render=True, run=3)
 
             if - best > self.target_return: #target_return:
                 print("Terminating controller training with value {}...".format(-cur_best))

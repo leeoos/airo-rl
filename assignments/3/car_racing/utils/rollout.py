@@ -1,8 +1,10 @@
 import torch
 from torchvision import transforms
-import gymnasium as gym
-import numpy as np
+
 import math
+import numpy as np
+import gymnasium as gym
+
 from tqdm import tqdm
 from time import sleep
 
@@ -52,6 +54,9 @@ class Rollout():
         cumulative = 0
         done = False
 
+        gamma = 0.9
+        t = 0
+
         for _ in range(limit):
             action = agent.act(obs) 
             obs, reward, terminated, truncated, _ = self.env.step(action)
@@ -59,10 +64,11 @@ class Rollout():
             done = terminated 
             if done: break
 
-            cumulative += reward # 50 100 -50
+            cumulative += math.exp(-t) * reward # 50 100 -50
+            t += 1
 
         # print("cumulative: {}".format(cumulative))
-        cumulative += temperature # reward "temperature"
+        # cumulative += temperature # reward "temperature"
         return (- cumulative) # 950 900 1050 
     
 
