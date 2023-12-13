@@ -158,7 +158,7 @@ class Policy(nn.Module):
         if exists(self.modules_dir+file_name): 
             self.c = self.c.load(self.modules_dir)
             print("Previous controller loaded")
-            cur_best = self.c.load(self.modules_dir, get_value=True)
+            # cur_best = self.c.load(self.modules_dir, get_value=True)
             print("Best current value for the objective function: {}".format(cur_best))
 
         # ####DEGUB####
