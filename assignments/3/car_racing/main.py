@@ -4,38 +4,9 @@ import numpy as np
 from student import Policy
 import gymnasium as gym
 
-import torch 
-import matplotlib.pyplot as plt
-
 def evaluate(env=None, n_episodes=1, render=False):
     agent = Policy()
-    agent.load()
-
-    # go = 0 
-    # ####DEGUB####
-    # for p in agent.c.parameters():
-    #     print('previous parameters: {}'.format(p))
-    #     go += 1
-    #     if go == 3 :break
-    # ####DEGUB####
-
-    # # X = torch.load(agent.data_dir+'observations.pt').to(agent.device)
-    # # samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
-    # # decodedSamples, _, _ = agent.vae.forward(samples)
-    
-    # # for index, obs in enumerate(samples):
-    # #     plt.subplot(5, 4, 2*index +1)
-    # #     obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2)).cpu()
-    # #     plt.imshow(obs.numpy(), interpolation='nearest')
-
-    # # for index, dec in enumerate(decodedSamples):
-    # #     plt.subplot(5, 4, 2*index +2)
-    # #     decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2)).cpu()
-    # #     plt.imshow(decoded.detach().numpy(), interpolation="nearest")
-
-    # # plt.show()
-    # # ####DEGUB####
-    
+    agent.load()   
 
     env = gym.make('CarRacing-v2', continuous=agent.continuous)
     if render:

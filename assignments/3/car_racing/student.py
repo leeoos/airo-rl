@@ -63,8 +63,8 @@ class Policy(nn.Module):
         # cma training parameters
         self.pop_size = 3
         self.n_samples = 4 
-        self.temperature = -3
-        self.target_return = 30
+        self.max_reward = 1000
+        self.stop_condiction = 800 # stop at (1000 - reward) e.g. s.c. = 200 --> reward = 800
 
   
     def act(self, state):
@@ -75,10 +75,9 @@ class Policy(nn.Module):
         state = state.unsqueeze(0).to(self.device)
 
         # obs compression
-        # mu, logvar = self.vae.encoder(state.float())
-        # z = self.vae.latent(mu, logvar)
         z = self.vae.get_latent(state.float())
         
+        # get action from controller
         a = self.c(z).to(self.device)   
 
         if not self.continuous:
@@ -131,67 +130,61 @@ class Policy(nn.Module):
                 plt.imshow(decoded.detach().numpy(), interpolation="nearest")
 
             plt.show()
-            sleep(2.)
-            plt.close()
+    
             ####DEGUB####
 
 ############################ TRAIN CONTROLLER ###############################
 #############################################################################
 
-        train_c = True
-        if not train_c:
-            go = 0 
-            ####DEGUB####
-            for p in self.c.parameters():
-                print('previous parameters: {}'.format(p))
-                go += 1
-                if go == 3 :break
-            ####DEGUB####
-            self.c = self.c.load(self.modules_dir)
-            params = self.c.parameters()
-            go = 0 
-            ####DEGUB####
-            for p in self.c.parameters():
-                print('previous parameters: {}'.format(p))
-                go += 1
-                if go == 3 :break
-            ####DEGUB####
-            flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
-            self.roller.rollout( 
-                                self, 
-                                flat_params, 
-                                device=self.device,
-                                continuous=self.continuous,
-                                temperature=self.temperature,
-                                render=True
-                                )
-            return
-
-        # log variables for cma controller
-        display = True
-        generation = 0
         
-        print("Attempting to load previous best...")
+
+        # ####DEGUB####
+        # go = 0 
+        # for p in self.c.parameters():
+        #     print('previous parameters: {}'.format(p))
+        #     go += 1
+        #     if go == 3 :break
+        # ####DEGUB####
        
+        print("Attempting to load previous best...")
         # define current best as max
         cur_best = 100000000000 # max cap
-
         file_name = 'controller.pt' if not self.continuous else 'continuous.pt'
         if exists(self.modules_dir+file_name): 
-            print("Previous controller loaded")
             self.c = self.c.load(self.modules_dir)
+            print("Previous controller loaded")
+            cur_best = self.c.load(self.modules_dir, get_value=True)
+            print("Best current value for the objective function: {}".format(cur_best))
 
+        # ####DEGUB####
+        # go = 0
+        # for p in self.c.parameters():
+        #     print('after parameters: {}'.format(p))
+        #     go += 1
+        #     if go == 3 :break
+        # ####DEGUB####
+
+        # set up cma parameters
         params = self.c.parameters()
         flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
         es = cma.CMAEvolutionStrategy(flat_params, 0.2, {'popsize':self.pop_size})
 
+        # log variables for cma controller
+        display = True
+        generation = 0
+
         print("Starting CMA training")
         print("Generation {}".format(generation+1))
 
-        while not es.stop(): # and generation < 20:
+        while not es.stop(): 
+            
+            if cur_best <= self.stop_condiction:
+                print("Already better than the target value")
+                print("Stop training...")
+                break
 
             # compute solutions
-            r_list = [0] * self.pop_size  # result list
+            result_list = [0] * self.pop_size  
             solutions = es.ask()
 
             if display: pbar = tqdm(total=self.pop_size*self.n_samples)
@@ -203,28 +196,28 @@ class Policy(nn.Module):
                                                 params, 
                                                 device=self.device,
                                                 continuous=self.continuous,
-                                                temperature=self.temperature
+                                                max_reward=self.max_reward
                                             )
-                    r_list[s_id] += value / self.n_samples
+                    result_list[s_id] += value / self.n_samples
                     if display: pbar.update(1)
 
             if display: pbar.close()
 
             # cma step
-            es.tell(solutions, r_list)
+            es.tell(solutions, result_list)
             es.disp()
 
             # evaluation and saving
             print("Evaluating...")
-            best_params, best, cur_mean = self.evaluate(solutions, r_list, run=6)
-            print("Current evaluation: {}".format((1000 - best-1000))) 
-            print("Current evaluation: {}".format((best))) 
+            best_params, best, cur_mean = self.evaluate(solutions, result_list, run=6)
+
+            print("Current evaluation of the objactive function (J): {} \nNote: this value should decrease".format((best))) 
             print("Current mean reward: {}".format(cur_mean)) 
 
             if not cur_best or cur_best > best: 
-                print("Saving new best with value {}...".format((cur_best)))
+                print("Previous best with value J = {}...".format((cur_best)))
                 cur_best = best
-                print("Saving new best with value {}...".format((cur_best)))
+                print("Saving new best with value J = {}...".format((cur_best)))
     
                 # load parameters into controller
                 unflat_best_params = self.roller.unflatten_parameters(best_params, self.c.parameters(), self.device)
@@ -232,13 +225,14 @@ class Policy(nn.Module):
                     p.data.copy_(p_0)
 
                 # saving
-                self.c.save(self.modules_dir)
+                self.c.save(self.modules_dir, f_value=cur_best)
                 self.save()
 
                 print("Rendering...")
-                self.evaluate(solutions, r_list, render=True, run=3)
+                self.evaluate(solutions, result_list, render=True, run=3)
 
-            if  cur_mean >= self.target_return:
+            # if cur_mean >= self.target_return:
+            if cur_best <= self.stop_condiction:
                 print("Terminating controller training with value {}...".format(-cur_best))
                 break
 
@@ -247,12 +241,11 @@ class Policy(nn.Module):
 
         return
     
-    
     def evaluate(self, solutions, results, render=False, run=6):
         index_min = np.argmin(results)
         best_guess = solutions[index_min]
-        restimates = []
-        mestimate = []
+        best_estimates = []
+        reward_estimate = []
 
         p_list = []
         for s_id in range(run):
@@ -265,11 +258,11 @@ class Policy(nn.Module):
                                             device=self.device, 
                                             render=render, 
                                             continuous=self.continuous,
-                                            temperature=self.temperature
+                                            max_reward=self.max_reward
                                         )    
-            restimates.append(value)
-            mestimate.append(reward)
-        return best_guess, np.mean(restimates), np.mean(reward)
+            best_estimates.append(value)
+            reward_estimate.append(reward)
+        return best_guess, np.mean(best_estimates), np.mean(reward_estimate)
     
 #############################################################################
     

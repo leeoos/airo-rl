@@ -33,10 +33,9 @@ class Rollout():
                 device='cpu', 
                 render=False, 
                 continuous=False, 
-                temperature=1000
+                max_reward=1000
         ):
        
-
         render_mode = 'human' if render else 'rgb_array'
         self.env = gym.make('CarRacing-v2', continuous=continuous, render_mode=render_mode)
 
@@ -53,7 +52,7 @@ class Rollout():
         weighted_reward = 0
         done = False
 
-        gamma = 0.9
+        gamma = -3
 
         for _ in range(limit):
             action = agent.act(obs) 
@@ -62,9 +61,8 @@ class Rollout():
             done = terminated 
             if done: break
 
-            weighted_reward += (10**(-temperature)) * reward # 50 100 -50
+            # weighted_reward += (10**(-gamma)) * reward # 50 100 -50
             cumulative += reward # 50 100 -50
-            temperature += 1
 
         self.env.reset()
         
@@ -72,6 +70,6 @@ class Rollout():
         # weighted_reward = cumulative + temperature # reward "temperature"
 
         # return (- weighted_reward),  cumulative# 950 900 1050 
-        return (1000 - cumulative),  cumulative# 950 900 1050 
+        return (max_reward - cumulative),  cumulative# 950 900 1050 
     
 

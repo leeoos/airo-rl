@@ -43,3 +43,17 @@ class Continuous(nn.Module):
         else:
             print("Error no model "+self.name.lower()+" found!")
             exit(1)
+
+    def load(self, dir, get_value=None): 
+        if exists(dir+self.name.lower()+'.pt'):
+            print("Loading model "+self.name+" state parameters")
+            state = torch.load(dir+self.name.lower()+'.pt', map_location={'cuda:0': 'cpu'})
+            self.load_state_dict(state['state_dict'])
+
+            if get_value : 
+                return state['f_value']
+            return self
+        
+        else:
+            print("Error no model "+self.name.lower()+" found!")
+            exit(1)

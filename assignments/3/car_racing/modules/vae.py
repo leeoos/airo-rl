@@ -57,6 +57,7 @@ class VAE(nn.Module):
         out = F.relu(self.conv3(out))
         out = F.relu(self.adaptive_pool(out))
         out = out.reshape(self.batch_size,1024)
+
         mu = self.mu(out)
         logvar = self.logvar(out)
         return mu, logvar
@@ -68,6 +69,7 @@ class VAE(nn.Module):
         out = F.relu(self.dec_conv1(out))
         out = F.relu(self.dec_conv2(out))
         out = torch.sigmoid(self.dec_conv3(out))
+        # out = F.relu(self.dec_conv3(out))
         out = torch.sigmoid(self.dec_conv4(out))
         return out
            
@@ -93,5 +95,18 @@ class VAE(nn.Module):
             print("Error no model "+self.name.lower()+" found!")
             exit(1)
             
+
+        
+#     def decode(self, z):
+#         out = self.fc(z)
+#         out = out.view(self.batch_size, 256, 6, 6)
+
+#         out = F.relu(self.dec_conv1(out))
+#         out = F.relu(self.dec_conv2(out))
+#         out = F.relu(self.dec_conv3(out))
+#         out = torch.sigmoid(self.dec_conv4(out))
+        
+#         return out
+        
 
 
