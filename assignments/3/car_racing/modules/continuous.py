@@ -1,10 +1,12 @@
 import torch
 import torch.nn as nn
+torch.manual_seed(42)
+
 
 from modules.vae import LATENT, OBS_SIZE
 
-from os import mkdir, unlink, listdir, getpid, remove
 from os.path import join, exists
+from os import mkdir, unlink, listdir, getpid, remove
 
 ACTIONS = 4
 CONTINUOUS = 3

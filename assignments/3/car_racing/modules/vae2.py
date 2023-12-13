@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+torch.manual_seed(42)
 
-from os import mkdir, unlink, listdir, getpid, remove
 from os.path import join, exists
+from os import mkdir, unlink, listdir, getpid, remove
 
 LATENT = 32
 CHANNELS = 3

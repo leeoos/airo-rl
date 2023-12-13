@@ -1,14 +1,16 @@
 import gymnasium as gym
 
-from os import mkdir, unlink, listdir, getpid, remove
-from os.path import join, exists
-import argparse
 import pickle
+import argparse
+from os.path import join, exists
+from os import mkdir, unlink, listdir, getpid, remove
 
 import torch
+torch.manual_seed(42)
 
-import numpy as np
+
 import math
+import numpy as np
 
 # to check
 def sample_continuous_actions(action_space, seq_len, dt):

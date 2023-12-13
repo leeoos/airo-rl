@@ -10,6 +10,7 @@ import torch
 import torch.nn.functional as F
 from torchvision import transforms
 from torch.utils.data import TensorDataset, DataLoader
+torch.manual_seed(42)
 
 import numpy as np
 import matplotlib.pyplot as plt

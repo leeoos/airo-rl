@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torchvision import transforms
+torch.manual_seed(42)
 
 import sys
 import time
@@ -23,11 +24,11 @@ from modules.controller import Controller
 from modules.continuous import CONTINUOUS
 from modules.continuous import Continuous
 
-from modules.vae import LATENT, OBS_SIZE
 from modules.vae import VAE 
+from modules.vae import LATENT, OBS_SIZE
 
-# from modules.vae2 import LATENT, OBS_SIZE
 # from modules.vae2 import VAE
+# from modules.vae2 import LATENT, OBS_SIZE
 
 from utils.rollout import Rollout
 import train.train_vae as vae_trainer
@@ -63,7 +64,7 @@ class Policy(nn.Module):
         # cma training parameters
         self.pop_size = 3
         self.n_samples = 4
-        self.fixed_seed = 588039 
+        self.fixed_seed = 546999 # model2.0
         self.max_reward = 1000
         self.stop_condiction = 700 # stop at (1000 - reward) e.g. s.c. = 200 --> reward = 800
 
