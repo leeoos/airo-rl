@@ -64,7 +64,7 @@ class Policy(nn.Module):
         self.pop_size = 3
         self.n_samples = 4 
         self.max_reward = 1000
-        self.stop_condiction = 800 # stop at (1000 - reward) e.g. s.c. = 200 --> reward = 800
+        self.stop_condiction = 700 # stop at (1000 - reward) e.g. s.c. = 200 --> reward = 800
 
   
     def act(self, state):
