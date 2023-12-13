@@ -61,10 +61,10 @@ class Policy(nn.Module):
         self.roller = Rollout()
 
         # cma training parameters
-        self.pop_size = 2
-        self.n_samples = 1 
-        self.temperature = 1000
-        self.target_return = -4
+        self.pop_size = 3
+        self.n_samples = 4 
+        self.temperature = -3
+        self.target_return = 30
 
   
     def act(self, state):
@@ -216,14 +216,15 @@ class Policy(nn.Module):
 
             # evaluation and saving
             print("Evaluating...")
-            best_params, best, cur_mean = self.evaluate(solutions, r_list, run=2)
-            print("Current evaluation: {}".format(- best)) 
+            best_params, best, cur_mean = self.evaluate(solutions, r_list, run=6)
+            print("Current evaluation: {}".format((1000 - best-1000))) 
+            print("Current evaluation: {}".format((best))) 
             print("Current mean reward: {}".format(cur_mean)) 
 
             if not cur_best or cur_best > best: 
+                print("Saving new best with value {}...".format((cur_best)))
                 cur_best = best
-
-                print("Saving new best with value {}...".format(-cur_best))
+                print("Saving new best with value {}...".format((cur_best)))
     
                 # load parameters into controller
                 unflat_best_params = self.roller.unflatten_parameters(best_params, self.c.parameters(), self.device)

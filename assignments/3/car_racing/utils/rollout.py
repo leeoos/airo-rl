@@ -50,10 +50,10 @@ class Rollout():
         # env params
         obs, _ = self.env.reset()
         cumulative = 0
+        weighted_reward = 0
         done = False
 
         gamma = 0.9
-        t = 0
 
         for _ in range(limit):
             action = agent.act(obs) 
@@ -62,14 +62,16 @@ class Rollout():
             done = terminated 
             if done: break
 
-            # cumulative += math.exp(-t) * reward # 50 100 -50
+            weighted_reward += (10**(-temperature)) * reward # 50 100 -50
             cumulative += reward # 50 100 -50
-            t += 1
+            temperature += 1
 
         self.env.reset()
         
         # print("cumulative: {}".format(cumulative))
-        weighted_reward = cumulative + temperature # reward "temperature"
-        return (- weighted_reward),  cumulative# 950 900 1050 
+        # weighted_reward = cumulative + temperature # reward "temperature"
+
+        # return (- weighted_reward),  cumulative# 950 900 1050 
+        return (1000 - cumulative),  cumulative# 950 900 1050 
     
 

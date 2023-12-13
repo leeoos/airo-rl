@@ -61,9 +61,7 @@ def evaluate(env=None, n_episodes=1, render=False):
 def train():
     agent = Policy()
     agent.train()
-    print("I am here")
     agent.save()
-    print("I am here 2")
 
 def main():
     parser = argparse.ArgumentParser(description='Run training and evaluation')

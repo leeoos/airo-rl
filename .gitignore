@@ -169,6 +169,7 @@ handin/
 log/
 dataset/
 clearlog.sh
-bar.py
+bar
 foo
+clear.sh
 
