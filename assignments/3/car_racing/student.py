@@ -138,7 +138,7 @@ class Policy(nn.Module):
 ############################ TRAIN CONTROLLER ###############################
 #############################################################################
 
-        train_c = False
+        train_c = True
         if not train_c:
             go = 0 
             ####DEGUB####
@@ -168,7 +168,6 @@ class Policy(nn.Module):
             return
 
         # log variables for cma controller
-        log_step = 3 # print log each n steps
         display = True
         generation = 0
         
@@ -178,12 +177,7 @@ class Policy(nn.Module):
         cur_best = 100000000000 # max cap
 
         file_name = 'controller.pt' if not self.continuous else 'continuous.pt'
-        if exists(self.modules_dir+file_name): # and exists(self.modules_dir+file_name):
-            # with open(self.modules_dir+'cur_best.bk', 'r') as f : 
-            #     for i in f : cur_best = float(i) 
-
-            # load previous model
-            # print("Previous best was {}...".format(-cur_best))
+        if exists(self.modules_dir+file_name): 
             print("Previous controller loaded")
             self.c = self.c.load(self.modules_dir)
 
@@ -195,10 +189,6 @@ class Policy(nn.Module):
         print("Generation {}".format(generation+1))
 
         while not es.stop(): # and generation < 20:
-
-            # if cur_best is not None and (-cur_best) > self.target_return:
-            #     print("Already better than target, breaking...")
-            #     break
 
             # compute solutions
             r_list = [0] * self.pop_size  # result list
@@ -242,34 +232,12 @@ class Policy(nn.Module):
 
                 # saving
                 self.c.save(self.modules_dir)
-                # with open(self.modules_dir+'cur_best.bk', 'w') as f: 
-                #     dump = cur_best 
-                #     f.write(str(dump))
                 self.save()
 
-                # ####DEGUB####
-                # go = 0
-                # for p in best_params:
-                #     print('best_params parameters: {}'.format(p))
-                #     go += 1
-                #     if go == 3 :break
-                # ####DEGUB####
-
-                # go = 0 
-                # ####DEGUB####
-                # for p in self.c.parameters():
-                #     print('previous parameters: {}'.format(p))
-                #     go += 1
-                #     if go == 3 :break
-                # ####DEGUB####
-
-                
-
                 print("Rendering...")
-                # self.evaluate(solutions, r_list, render=True, run=3)
+                self.evaluate(solutions, r_list, render=True, run=3)
 
-            # if - best > self.target_return: #target_return:
-            if  cur_mean >= 10: #-1000: #target_return:
+            if  cur_mean >= self.target_return:
                 print("Terminating controller training with value {}...".format(-cur_best))
                 break
 

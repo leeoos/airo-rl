@@ -25,20 +25,6 @@ class Rollout():
             unflattened += [params[idx:idx + e_p.numel()].view(e_p.size())]
             idx += e_p.numel()
         return unflattened
-    
-
-    # def load_parameters(self, params, controller):
-    #     """ Load flattened parameters into controller.
-
-    #     :args params: parameters as a single 1D np array
-    #     :args controller: module in which params is loaded
-    #     """
-    #     proto = next(controller.parameters())
-    #     params = self.unflatten_parameters(params, controller.parameters(), proto.device)
-
-    #     for p, p_0 in zip(controller.parameters(), params):
-    #         p.data.copy_(p_0)
-    
 
     def rollout(self, 
                 agent, 
