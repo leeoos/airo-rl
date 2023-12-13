@@ -66,7 +66,7 @@ def loss_function(recon_x, x, mu, logsigma):
     BCE = bce_loss(recon_x, x)  
     MSE = F.mse_loss(recon_x, x, reduction='sum')
     KLD = -0.5 * torch.sum(1 + 2 * logsigma - mu.pow(2) - (2 * logsigma).exp())
-    return BCE + KLD
+    return MSE + KLD
     
 
 if __name__ == "__main__":

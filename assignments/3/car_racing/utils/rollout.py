@@ -64,11 +64,14 @@ class Rollout():
             done = terminated 
             if done: break
 
-            cumulative += math.exp(-t) * reward # 50 100 -50
+            # cumulative += math.exp(-t) * reward # 50 100 -50
+            cumulative += reward # 50 100 -50
             t += 1
 
+        self.env.reset()
+        
         # print("cumulative: {}".format(cumulative))
-        # cumulative += temperature # reward "temperature"
-        return (- cumulative) # 950 900 1050 
+        cumulative += temperature # reward "temperature"
+        return (- cumulative),  cumulative# 950 900 1050 
     
 

@@ -26,12 +26,15 @@ from modules.continuous import Continuous
 from modules.vae import LATENT, OBS_SIZE
 from modules.vae import VAE 
 
+# from modules.vae2 import LATENT, OBS_SIZE
+# from modules.vae2 import VAE
+
 from utils.rollout import Rollout
 import train.train_vae as vae_trainer
 
 class Policy(nn.Module):
     
-    continuous = True
+    continuous = False
 
     def __init__(self, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')):
         super(Policy, self).__init__()
@@ -61,7 +64,7 @@ class Policy(nn.Module):
         self.pop_size = 6
         self.n_samples = 2 
         self.temperature = 1000
-        self.target_return = 950 + self.temperature
+        self.target_return = 950 
 
   
     def act(self, state):
@@ -72,8 +75,9 @@ class Policy(nn.Module):
         state = state.unsqueeze(0).to(self.device)
 
         # obs compression
-        mu, logvar = self.vae.encode(state.float())
-        z = self.vae.latent(mu, logvar)
+        # mu, logvar = self.vae.encoder(state.float())
+        # z = self.vae.latent(mu, logvar)
+        z = self.vae.get_latent(state.float())
         
         a = self.c(z).to(self.device)   
 
@@ -110,25 +114,25 @@ class Policy(nn.Module):
             self.vae = self.vae.load(self.modules_dir).to(self.device)
 
             ####DEGUB####
-            self.vae = self.vae.load('./foo/').to(self.device)
-            # # self.vae = torch.load('./foo/vae.pt', map_location=torch.device(self.device))
-            # X = torch.load(self.data_dir+'observations.pt').to(self.device)
-            # samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
-            # decodedSamples, _, _ = self.vae.forward(samples)
+            # self.vae = self.vae.load('./foo/').to(self.device)
+            # self.vae = torch.load('./foo/vae.pt', map_location=torch.device(self.device))
+            X = torch.load(self.data_dir+'observations.pt').to(self.device)
+            samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
+            decodedSamples, _, _ = self.vae.forward(samples)
             
-            # for index, obs in enumerate(samples):
-            #     plt.subplot(5, 4, 2*index +1)
-            #     obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2)).cpu()
-            #     plt.imshow(obs.numpy(), interpolation='nearest')
+            for index, obs in enumerate(samples):
+                plt.subplot(5, 4, 2*index +1)
+                obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2)).cpu()
+                plt.imshow(obs.numpy(), interpolation='nearest')
 
-            # for index, dec in enumerate(decodedSamples):
-            #     plt.subplot(5, 4, 2*index +2)
-            #     decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2)).cpu()
-            #     plt.imshow(decoded.detach().numpy(), interpolation="nearest")
+            for index, dec in enumerate(decodedSamples):
+                plt.subplot(5, 4, 2*index +2)
+                decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2)).cpu()
+                plt.imshow(decoded.detach().numpy(), interpolation="nearest")
 
-            # plt.show()
-            # sleep(2.)
-            # plt.close()
+            plt.show()
+            sleep(2.)
+            plt.close()
             ####DEGUB####
 
 ############################ TRAIN CONTROLLER ###############################
@@ -145,12 +149,12 @@ class Policy(nn.Module):
         cur_best = 100000000000 # max cap
 
         file_name = 'controller.pt' if not self.continuous else 'continuous.pt'
-        if exists(self.modules_dir+file_name) and exists(self.modules_dir+file_name):
-            with open(self.modules_dir+'cur_best.bk', 'r') as f : 
-                for i in f : cur_best = float(i) 
+        if exists(self.modules_dir+file_name): # and exists(self.modules_dir+file_name):
+            # with open(self.modules_dir+'cur_best.bk', 'r') as f : 
+            #     for i in f : cur_best = float(i) 
 
             # load previous model
-            print("Previous best was {}...".format(-cur_best))
+            # print("Previous best was {}...".format(-cur_best))
             self.c = self.c.load(self.modules_dir)
 
         params = self.c.parameters()
@@ -162,9 +166,9 @@ class Policy(nn.Module):
 
         while not es.stop(): # and generation < 20:
 
-            if cur_best is not None and (-cur_best) > self.target_return:
-                print("Already better than target, breaking...")
-                break
+            # if cur_best is not None and (-cur_best) > self.target_return:
+            #     print("Already better than target, breaking...")
+            #     break
 
             # compute solutions
             r_list = [0] * self.pop_size  # result list
@@ -174,12 +178,13 @@ class Policy(nn.Module):
             
             for s_id, params in enumerate(solutions):
                 for _ in range(self.n_samples):
-                    value = self.roller.rollout(self, 
+                    value, _ = self.roller.rollout( 
+                                                self, 
                                                 params, 
                                                 device=self.device,
                                                 continuous=self.continuous,
                                                 temperature=self.temperature
-                                        )
+                                            )
                     r_list[s_id] += value / self.n_samples
                     if display: pbar.update(1)
 
@@ -191,8 +196,9 @@ class Policy(nn.Module):
 
             # evaluation and saving
             print("Evaluating...")
-            best_params, best = self.evaluate(solutions, r_list)
+            best_params, best, cur_mean = self.evaluate(solutions, r_list)
             print("Current evaluation: {}".format(- best)) 
+            print("Current mean reward: {}".format(cur_mean)) 
 
             if not cur_best or cur_best > best: 
                 cur_best = best
@@ -205,15 +211,16 @@ class Policy(nn.Module):
 
                 # saving
                 self.c.save(self.modules_dir)
-                with open(self.modules_dir+'cur_best.bk', 'w') as f: 
-                    dump = cur_best 
-                    f.write(str(dump))
+                # with open(self.modules_dir+'cur_best.bk', 'w') as f: 
+                #     dump = cur_best 
+                #     f.write(str(dump))
                 self.save()
 
                 print("Rendering...")
                 self.evaluate(solutions, r_list, render=True, run=3)
 
-            if - best > self.target_return: #target_return:
+            # if - best > self.target_return: #target_return:
+            if  cur_mean >= 50: #target_return:
                 print("Terminating controller training with value {}...".format(-cur_best))
                 break
 
@@ -227,21 +234,24 @@ class Policy(nn.Module):
         index_min = np.argmin(results)
         best_guess = solutions[index_min]
         restimates = []
+        mestimate = []
 
         p_list = []
         for s_id in range(run):
             p_list.append((s_id, best_guess))
 
         for _ in tqdm(range(run)):
-            value = self.roller.rollout(self, 
-                                        best_guess, 
-                                        device=self.device, 
-                                        render=render, 
-                                        continuous=self.continuous,
-                                        temperature=self.temperature
-                                )    
+            value, reward = self.roller.rollout(
+                                            self, 
+                                            best_guess, 
+                                            device=self.device, 
+                                            render=render, 
+                                            continuous=self.continuous,
+                                            temperature=self.temperature
+                                        )    
             restimates.append(value)
-        return best_guess, np.mean(restimates)
+            mestimate.append(reward)
+        return best_guess, np.mean(restimates), np.mean(reward)
     
 #############################################################################
     
