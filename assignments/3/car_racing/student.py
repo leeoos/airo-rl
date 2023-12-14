@@ -67,7 +67,7 @@ class Policy(nn.Module):
         self.fixed_seed = 588039 
         self.max_reward = 1000
         # self.stop_condiction = 700 # stop at (1000 - reward) e.g. s.c. = 200 --> reward = 800
-        self.target_mean = 600 # target mean reward
+        self.target_mean = 700 # target mean reward
 
   
     def act(self, state):
