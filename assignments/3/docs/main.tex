@@ -66,46 +66,102 @@
 
 \section{Theory}
 \subsection{Exercise 1}
+In the context of this exercise, we need to consider an environment that allows two possible actions and features a two-dimensional state representation, denoted as $x(s)\in R^2$. This scenario involves the application of the 1-step Actor-Critic Algorithm with specific policy and action-state value function approximators:
 
-\noindent Assuming $\alpha \:=\: 0.1$ and $\gamma \:=\: 0.5$, after the experience: $(s, a, r, s^{\prime}) = (1,2,3,2)$ we can compute the Q-table update for:
+\begin{gather*}
+    \pi_{\theta}(a=1|s) \:=\: \sigma(\theta^{T} x(s)) \:=\: \frac{1}{1\:+\:e^{-(\theta^{T} x(s))}} \\
+    Q_w (s,a=0) \:=\: w_{0}^{T}x(s) \\
+    Q_w (s,a=1) \:=\: w_{1}^{T}x(s)
+\end{gather*} 
+
+\noindent Give the initial values for the weights and the values of the hyper-parameters:
+
+\begin{gather*}
+    w_{0} \:=\: (0.8, \:1)^{T},\: w_1 \:=\: (0.4, 0)^{T} \\
+    \theta_{0} \: = \: (1, 0.5)^{T} \\
+    \alpha_{w} \:=\: \alpha_{\theta} \:=\: \alpha \:=\: 0.1 \\
+    \gamma \:=\: 0.9 
+\end{gather*} 
+
+\noindent As well as a defined transition:
+\begin{center}
+    $ x(s_0) = (1,0)^{T}, \: a_0=0, \: r_1=0, \:x(s_1) = (0,1)^{T}, \:a_{1} = 1 $
+\end{center}
+
+\vspace*{5pt}
+\noindent The task is to compute new values of $w_0$, $w_1$ and $\theta$ after the given transition. To do this we have to follow the steps of the \textit{Q Actor-Critic} update method where:
 \begin{enumerate}
-    \item Q-Learning 
-    \item SARSA in the case $a' \:=\: \pi_{\epsilon}(s^{\prime}) \:=\: 2$
+    \item The weights of the "Critic" network \textbf{w} are updated to minimize the TD error;
+    \item The weights of the "Actor" network $\theta$ are updated in the direction suggested by the Critic.
 \end{enumerate} 
-1. In the case of Q-Learning we can proceed using the following update rule:
-\begin{equation*}
-    Q(s,a) = Q(s,a) \:+\: \alpha [ \:r \:+\: \gamma(max_{a}Q(s^{\prime},a')) \:-\: Q(s,a)]
-\end{equation*}
-So we would have:
-\begin{align*}
-    && Q(s,a) = Q(1,2) \:+\: 0.1 [ \:3 \:+\: 0.5(max_{a}Q(2,a')) \:-\: Q(1,2)] \\
-    && \\
-    &\rightarrow& Q(1,2) \:+\: 0.1 [ \:3 \:+\: 0.5(max(Q(2,1), \:Q(2,2))) \:-\: Q(1,2)] \\
-    && \\
-    &\rightarrow&2 \:+\: 0.1 [ \:3 \:+\: 0.5\cdot4 \:-\: 2] \\
-    && \\
-    &\rightarrow&2 \:+\: 0.3 = 2.3 \\
-\end{align*}
-\vspace{5pt}
 
-\noindent 2. For SARSA we use as update rule:
-\begin{equation*}
-    Q(s,a) = Q(s,a) \:+\: \alpha [ \:r \:+\: \gamma(Q(s^{\prime},a')) \:-\: Q(s,a)]
+\noindent As first step we must compute the TD error, this can be done by the usual formula:
+\begin{equation} \label{eq:TD}
+    \delta = r \:+\: \gamma Q_{w}(s',\;a') - Q_{w}(s,\:a) 
+\end{equation}
+In this case ($s$, $a$) and ($s'$, $a'$) are given as $x(s_0)$, $a_{0}$ and $x(s_1)$, $a_{1}$. Now we have to evaluate the Q-function approximations for the given state-action pairs:
+\begin{flalign*}
+    Q_w (s,a = 0) \:=\: w_{0}^{T}x(s) \:=\: \begin{pmatrix}0.8 & 1\end{pmatrix} \begin{pmatrix} 1 \\ 0 \end{pmatrix} \:=\: 0.8 &\\
+    &\\
+    Q_w (s,a = 1) \:=\: w_{1}^{T}x(s) \:=\: \begin{pmatrix}0.4 & 0\end{pmatrix} \begin{pmatrix} 0 \\ 1 \end{pmatrix} \:=\:  0 &
+\end{flalign*}
+Now we have all the numerical value to substitute in \ref{eq:TD}, after doing this we obtain:
+\begin{equation*} 
+    \delta = 0 \:+\: 0.9 \cdot (0) \:-\: 0.8 \:=\: -0.8  
 \end{equation*}
-in this case $a'=2$, so we would have:
-\begin{align*}
-    && Q(s,a) = Q(1,2) \:+\: 0.1 [ \:3 \:+\: 0.5(Q(2,a'))\:-\: Q(1,2)] \\
-    && \\
-    &\rightarrow& Q(1,2) \:+\: 0.1 [ \:3 \:+\: 0.5(Q(2,2))\:-\: Q(1,2)] \\
-    && \\
-    &\rightarrow&2 \:+\: 0.1 [ \:3 \:+\: 0.5\cdot4 \:-\: 2) \\
-    && \\
-    &\rightarrow&2 \:+\: 0.3 = 2.3 \\
-\end{align*}
+
+\noindent For the update of the weight \textbf{w} we should compute the gradient of Q w.r.t. \textbf{w} itself. We can write the general formula as:
+\begin{equation} 
+    \mathbf{w} \:=\: \mathbf{w} \:+\: \alpha \gamma \nabla_{w} Q_{w} (s,a) 
+\end{equation}
+It is possible to decuple the computation of the new weights in two different equations:
+\begin{equation*}
+    w_{0} \:=\: w_{0} \:+\: \alpha \gamma \nabla_{w} Q_{w_0} (x(s_0), a_0) \:=\: \begin{pmatrix} 0.8 \\ 1 \end{pmatrix} \:-\: 
+    0.8 \cdot 0.1 \cdot \begin{pmatrix} 1 \\ 0\end{pmatrix} \:=\: \begin{pmatrix} 0.72 \\ 1\end{pmatrix}
+\end{equation*}
+
+\noindent Regarding the second equation, the gradient with respect to $w_1$ of $Q(x(s), a_1)$ would be used to update $w_{1}$ only if the action $a_1 = 0$ was taken at state $x(s_0)$. In the given problem statement, since the action $a_0 = 0$ was taken at state $x(s)$, we would not use the gradient of $Q(x(s), a_1)$  for the update in this step. Using instead the gradient of $Q(x(s), a_0)$ lead to no change for the vector $w_1$:
+\begin{equation*}
+    w_{1} \:=\: w_{1} \:+\: \alpha \gamma \nabla_{w} Q_{w_1} (x(s), a_0) \:=\: \begin{pmatrix} 0.4 \\ 0 \end{pmatrix} \:-\: 
+    0.8 \cdot 0.1 \cdot \begin{pmatrix} 0 \\ 0\end{pmatrix} \:=\: \begin{pmatrix} 0.4 \\ 0\end{pmatrix}
+\end{equation*}
+In certain variations of the Actor-Critic algorithm, one might update both $w_0$ and $w_1$ using the respective gradients even if one of the associated actions was not taken, as part of an off-policy learning method. This choice would lead to the following update:
+\begin{equation*}
+    w_{1} \:=\: w_{1} \:+\: \alpha \gamma \nabla_{w} Q_{w_1} (x(s_1), a_1) \:=\: \begin{pmatrix} 0.4 \\ 0 \end{pmatrix} \:-\: 
+    0.8 \cdot 0.1 \cdot \begin{pmatrix} 0 \\ 1\end{pmatrix} \:=\: \begin{pmatrix} 0.4 \\ -0.08\end{pmatrix}
+\end{equation*}
+
 \newpage
+\noindent Finally we can compute the new value of $\theta$ according to:
+\begin{equation}
+    \theta \:=\: \theta \:+\: \alpha \delta \nabla_{\theta} \:\log \pi_{\theta} (a | s)
+\end{equation}
+In particular we need the expression for $\pi_{\theta}(a\:=\:0|s)$ in order to calculate the gradient. To obtain this expression we could make the observation that, since the action space is binary and $\pi$ represent a probability distribution over actions, 
+$\pi_{\theta}(a=0|s) \:=\: 1 \:-\: \pi_{\theta}(a=1|s)$. After established this we can proceed with the computation of the gradient:
+\vspace*{5pt}
+\begin{flalign*}
+    \nabla_{\theta} \: \log ( 1 - \pi_{\theta}(a=1|s)) = &&\\
+    && &&\\
+    \nabla_{\theta} \: \log \left( 1 - \frac{1}{1 + e^y} \right) \:=\: \nabla_{\theta} \: \log\left(\frac{1+e^{y}-1}{1 + e^y}\right) \:=\: && \text{Where}\; \; y = -(\theta^{T} x(s)) \text{...}&& \\
+    && &&\\
+    \nabla_{\theta} \: \log\left(\frac{e^{y}}{1 + e^y}\right) \:=\:  \nabla_{\theta} \: \log(e^y) \:-\: \nabla_{\theta} \: \log\left(\frac{e^{y}}{1 + e^y}\right) \:=\: &&\\
+    && &&\\
+    \nabla_{\theta} y \:-\: \nabla_{\theta} \: \log(1+e^y) \:=\: && \text{...substituting y...} && \\
+    && &&\\
+    - x(s) \:+\: \frac{x(s) \cdot e^{-(\theta^{T} x(s))}}{1 + e^{-(\theta^{T} x(s))}} \:=\:  && \text{...and taking the gradient.} &&\\
+    && &&\\
+    \frac{-x(s) - x(s) \cdot e^{-(\theta^{T} x(s))} + x(s) \cdot e^{-(\theta^{T} x(s))} }{1 + e^{-(\theta^{T} x(s))}} \:=\: && \text{Evaluating in} \:\: x(s_0), \: \theta_0 \text{...} &&\\
+    && &&\\
+    \frac{-x(s)}{1 + e^{-(\theta^{T} x(s))}} \:=\: - \begin{pmatrix} 0.73 \\ 0 \end{pmatrix}
+\end{flalign*}
 
+\noindent The final update for $\theta$ is given by:
+\begin{equation*}
+    \begin{pmatrix} 1.05 \\ 0 \end{pmatrix} \:=\: \begin{pmatrix} 1 \\ 0.5 \end{pmatrix} \:+\: 0.1 \cdot 0.8 \cdot \begin{pmatrix} 0.73 \\ 0 \end{pmatrix}
+\end{equation*}
+\newpage 
 
-\section{Code Implementation}
+\section{World Models}
 text example \cite{DBLP:journals/corr/abs-1803-10122} \cite{ctallec-wm}
  
 \subsection{Task Overview}
@@ -129,27 +185,6 @@ text example \cite{DBLP:journals/corr/abs-1803-10122} \cite{ctallec-wm}
 \subsection{Results}
 \newpage
 
-\begin{lstlisting}
-def initialization(env):
-    # Set up sklearn scaler function
-    scaler = sklearn.preprocessing.StandardScaler()
-    # Sampling a sequence of states to fit rbf
-    for for num_of_sample:
-        sampled_states = [env.observation_space.sample()]
-    scaler.fit(sampled_states) # scale the sampled data
-    # Set up of RBF encoder
-    num_of_features <- set_number_of_features
-    self.gamma <- initialization_of_gamma
-    encoder =  RBFSampler(gamma, num_of_features)
-    encoder.fit(self.scaler.transform(sampled_states))
-
-def encode(state):
-    # Use the rbf encoder to return the features
-    scaled_state = scaler.transform(state)
-    features = encoder.transform(scaled_state)
-    # Flatten to restore the original state dimensionality
-    return features.flatten() 
-\end{lstlisting}
 \newpage
 
 

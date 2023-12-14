@@ -1,5 +1,6 @@
 import torch
 from torchvision import transforms
+torch.manual_seed(42)
 
 import math
 import numpy as np
