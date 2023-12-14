@@ -64,8 +64,8 @@ class Policy(nn.Module):
         # cma training parameters
         self.pop_size = 3
         self.n_samples = 4
-        self.fixed_seed = 546999 # model2.0
-        self.max_reward = 2000
+        self.fixed_seed = 548695 # model2.0
+        self.max_reward = 1000
         self.expected_reward = 300
         # stop when reward >= (max_reward - reward)
         # e.g. stop_condiction=200 and max_reward=1000 --> reward>=800
