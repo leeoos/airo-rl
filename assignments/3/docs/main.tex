@@ -50,7 +50,9 @@
         \Large Author:
         \textbf{Leonardo Colosi 1799057}\\
         \vspace{0.5cm}
-        \Large Contributors: \textbf{Bruno Francesco Nocera 1863075, Silverio Manganaro 1817504, Simone Tozzi, 1615930, Paolo Renzi 1887793, Jacopo Tedeschi 1882789, Amine Ahardane 2050689.}
+        \Large Main Contributors: \textbf{Bruno Francesco Nocera 1863075, Paolo Renzi 1887793} \\
+        \vspace{0.3cm} 
+        \Large Other Contributors: \textbf{Silverio Manganaro 1817504, Jacopo Tedeschi 1882789}
         \vfill
         \includegraphics[width=0.7\textwidth]{images/sapienza_logo.png}
         \vfill
@@ -131,20 +133,21 @@ In certain variations of the Actor-Critic algorithm, one might update both $w_0$
     0.8 \cdot 0.1 \cdot \begin{pmatrix} 0 \\ 1\end{pmatrix} \:=\: \begin{pmatrix} 0.4 \\ -0.08\end{pmatrix}
 \end{equation*}
 
-\newpage
 \noindent Finally we can compute the new value of $\theta$ according to:
 \begin{equation}
     \theta \:=\: \theta \:+\: \alpha \delta \nabla_{\theta} \:\log \pi_{\theta} (a | s)
 \end{equation}
 In particular we need the expression for $\pi_{\theta}(a\:=\:0|s)$ in order to calculate the gradient. To obtain this expression we could make the observation that, since the action space is binary and $\pi$ represent a probability distribution over actions, 
-$\pi_{\theta}(a=0|s) \:=\: 1 \:-\: \pi_{\theta}(a=1|s)$. After established this we can proceed with the computation of the gradient:
+$\pi_{\theta}(a=0|s) \:=\: 1 \:-\: \pi_{\theta}(a=1|s)$. 
+
+Established this we can proceed with the computation of the gradient:
 \vspace*{5pt}
 \begin{flalign*}
-    \nabla_{\theta} \: \log ( 1 - \pi_{\theta}(a=1|s)) = &&\\
+    \nabla_{\theta} \: \log ( 1 - \pi_{\theta}(a=1|x(s_0))) = &&\\
     && &&\\
-    \nabla_{\theta} \: \log \left( 1 - \frac{1}{1 + e^y} \right) \:=\: \nabla_{\theta} \: \log\left(\frac{1+e^{y}-1}{1 + e^y}\right) \:=\: && \text{Where}\; \; y = -(\theta^{T} x(s)) \text{...}&& \\
+    \nabla_{\theta} \: \log \left( 1 - \frac{1}{1 + e^y} \right) \:=\: \nabla_{\theta} \: \log\left(\frac{1+e^{y}-1}{1 + e^y}\right) \:=\: && \text{where}\; \; y = -(\theta^{T} x(s)) \text{...}&& \\
     && &&\\
-    \nabla_{\theta} \: \log\left(\frac{e^{y}}{1 + e^y}\right) \:=\:  \nabla_{\theta} \: \log(e^y) \:-\: \nabla_{\theta} \: \log\left(\frac{e^{y}}{1 + e^y}\right) \:=\: &&\\
+    \nabla_{\theta} \: \log\left(\frac{e^{y}}{1 + e^y}\right) \:=\:  \nabla_{\theta} \: \log(e^y) \:-\: \nabla_{\theta} \: \log\left(\frac{e^{y}}{1 + e^y}\right) \:=\: && \text{...splitting the logarithm ...} && \\\\
     && &&\\
     \nabla_{\theta} y \:-\: \nabla_{\theta} \: \log(1+e^y) \:=\: && \text{...substituting y...} && \\
     && &&\\
@@ -155,31 +158,114 @@ $\pi_{\theta}(a=0|s) \:=\: 1 \:-\: \pi_{\theta}(a=1|s)$. After established this 
     \frac{-x(s)}{1 + e^{-(\theta^{T} x(s))}} \:=\: - \begin{pmatrix} 0.73 \\ 0 \end{pmatrix}
 \end{flalign*}
 
-\noindent The final update for $\theta$ is given by:
+\noindent To obtain the final evaluation we should take in account that:
+\begin{itemize}
+    \item $\theta^{T} x(s) \:=\: 1$;
+    \item $1+e^{-1} \:=\: 1.36$;
+    \item $\frac{1}{1+e^{-1}} \:=\: 0.73$.
+\end{itemize}
+The new value for $\theta$ is given by:
 \begin{equation*}
-    \begin{pmatrix} 1.05 \\ 0 \end{pmatrix} \:=\: \begin{pmatrix} 1 \\ 0.5 \end{pmatrix} \:+\: 0.1 \cdot 0.8 \cdot \begin{pmatrix} 0.73 \\ 0 \end{pmatrix}
+    \theta \:=\: \theta_0 \:+\: \alpha \delta \nabla_{\theta} \:\log \pi_{\theta} (a=0 | x(s_0))
+    \:=\: \begin{pmatrix} 1 \\ 0.5 \end{pmatrix} \:+\: 0.1 \cdot 0.8 \cdot \begin{pmatrix} 0.73 \\ 0 \end{pmatrix} \:=\: \begin{pmatrix} 1.05 \\ 0.5 \end{pmatrix} 
 \end{equation*}
 \newpage 
 
 \section{World Models}
-text example \cite{DBLP:journals/corr/abs-1803-10122} \cite{ctallec-wm}
  
 \subsection{Task Overview}
-\newpage
+The task of this assignment was to solve the CarRacing-v2 gym environment using one of the proposed algorithms. A complete description of the environment is reported on \href{https://www.gymlibrary.dev/environments/box2d/car_racing/}{\underline{gym  car-racing website}}. The generated track is random every episode, the observation states consists of 96x96 pixels images. The reward is $-0.1$ every frame and $+1000/N$ for every track tile visited, where N is the total number of tiles visited in the track. This means that agent would receive higher reward for completing the track in a shorter amount of time, this also means that in general moving is better than do nothing (even if sometimes it means to move off-track). From this observation we can conclude that the reward is not a perfect metric to evaluate the performance of the car but it's still a good way to influence its behavior. 
 
 \subsection{Solution Strategy}
+The strategy chosen among the proposed solution is the one presented on \textit{World Models} \cite{DBLP:journals/corr/abs-1803-10122}. I, along with my colleagues listed as main Contributors, have implemented a simplified version of the model proposed in the paper. The main idea expressed in their work is to combine three different models (see fig.1) in order to obtain the best performance from the agent. 
+\begin{itemize}
+    \item A Variational Auto Encoder (V) used for feature extraction and state representation (z);
+    \item A MDN-RNN (M) as a predictive model of the future z vectors that V is expected to produce;
+    \item A Controller responsible for selecting the action for the agent given the current observation (z) and the temporal information (h) given by M.
+\end{itemize}
+We have decide to reduce the size of the model by removing the M module since \dots
+The rest of the implementation is build around the Variational Auto Encoder that we have coded from scratch and the CMA-ES training strategy for the Controller for which we have took inspiration from a Github repository that has implemented as similar version of World Models \cite{ctallec-wm}.  
+
 \newpage
 
 \subsection{Code Structure}
-\newpage
+The assignment directory is organized in modular components according to the implementation logic of World Models. Here it is a summary of the general structure:
+\begin{itemize}
+    \item \textbf{checkpoints}: shared directory to store the state dictionary of the various components of the model;
+    \item \textbf{dataset}: local directory to store a collection of observation used to train the VAE;
+    \item \textbf{modules}: contains the implementation of the architecture modules;
+    \item \textbf{train}: is a directory that contains the files necessary to run the training of the NN modules;
+    \item \textbf{utils}: is a collection of function used to perform random rollout, to gather and manipulate environment data and to handle the controller parameters;
+    \item \textit{main.py}: the main file for the execution of both training and evaluation of the entire model (unchanged);
+    \item \textit{student.py}: this file contains the implementation of the act function for the agent (\textit{Policy}) as well as the main function to train the controller.
+\end{itemize}
+In the following sections is reported a detailed explanation of the most relevant components of the project.
 
-\subsection{VAE Implementation}
+\subsection{Data Collection}
+The task of collecting random frames from the environment, in order to give the agent a meaningful, generalized representation of the world, is handled by \textit{collect\_data.py}. This script is responsible of performing random rollouts, moving the agent in various direction and collecting a the desired number of frames (as long as the termination state is not encountered before). The random rollouts could be performed both in continuous and discrete settings, what change between the two cases is how the random policy select the actions.
+\begin{itemize}
+    \item \textit{Discrete case}: sample one random int form \{1,2,3,4\} $\rightarrow$ \{do nothing, steer left, steer right, gas, brake\}, in this case the action \{0: do nothing\} is discarded because it would be of no use to collect meaningful observations. 
+    \item \textit{Continuous case}: sample one action from the continuous action space (dim=3) of the environment. To action is then added a weighted random sample extracted from a normal distribution to increase the change of performing "strange action in order to gather more generalized information. 
+\end{itemize}
+All data are then saved inside the local directory dataset, this directory is not contained in the zip file because of its size. The collected data are the one used to train the Neural Networks components of the architecture.
+\newpage
+\subsection{Variational Auto Encoder}
+The Variational Auto Encoder (VAE) implemented for this assignment is a "vanilla" auto-encoder consisting of 3 \textit{Convolutional} layers and one \textit{Adaptive Pooling} for the encoder, two \textit{Linear} layers for computing $\mu$ and $\sigma$ and a combination of one \textit{Linear} layer and 3 \textit{Transposed Convolutional} for the decoder. The encoder reduce the dimensionality of the input images to a tensor of shape (1, 1025). This vector is then used to compute the latent space $z$ of size 32, this is a good enough compression of the original frames. The only manipulation applied to the images was a normalization of the pixels value between 0 and 1. The lightweight nature of the network has shown advantages both in training and in the application. The model required a short amount of training time while showing good result in the image compression/reconstruction. 
+\subsubsection{VAE Training Strategy}
+The training phase of the auto-encoder was carried on using different evaluation functions over the reconstructed images as inputs and the original images as target. The main loss used was the Kullback-Leibler Divergence (KDL) combined alteratively  with and the Mean Square Error (MSE) and the Weighted Binary Cross Entropy (BCE). The former performed best in terms of numerical loss values but the latter perform better in terms of final images reconstruction.\\
+Here are the expression of the functions:
+\begin{gather}
+    \text{KLD} = -\frac{1}{2} \sum_{j=1}^J (1 + \log((\sigma_j)^2) - (\mu_j)^2 - (\sigma_j)^2) \\
+    \text{MSE} = \frac{1}{N} \sum_{i=1}^N (y_i - \hat{y}_i)^2 \\
+    \text{BCE} = -\frac{1}{N} \sum_{i=1}^N [y_i \log(\hat{y}_i) + (1 - y_i) \log(1 - \hat{y}_i)]
+\end{gather}
+This plots show  the evolution of the loss functions during training.
+INSERT PLOT HERE
+
+\subsubsection{VAE Results}
+The following are the results images reconstructed by the VAE. It can be notice that when the track is straight the network is able to reconstruct it pretty well, capturing also the features of the red racing curb. On the other hand, when there is a hairpin turn the results are poor, leading to bad performance of the car in this environmental conditions.
+INSERT IMAGES HERE
+
 \newpage
 
 % \subsection{RNN}
 % \newpage
 
 \subsection*{Controller}
+The controller block is implemented as a simple \text{Linear} layer as suggested in the paper. There are two scripts inside the \textbf{modules} directory that represents two similar controllers, one to be used in a discrete environment (\textit{discrete.py}) the other (\textit{continuous.py}) for the continuous case. As we decide to not add the MDN-RNN module to the final architecture the dimensionality  of the input expected by the controller coincide exactly with the size of the latent space of the VAE. The output is different for the two cases:\\
+
+\underline{\textit{Discrete case}}: here the output is a 4-dimensional vector where each element represent the probability of choosing one action. Through the \textit{argmax} function the index with the highest probability is selected. I have decide to crop the action-space (the discrete case has 5 possible action) in order to exclude the action do nothing, to do so a +1 is added to the output of \textit{argmax}.\\
+
+\underline{\textit{Continuous case}}: this case is straight forward, the output od the controller here is a 3-dimensional vector, as it is the dimension of the action-space, which is direclty given to the environment step function.\\
+
+\noindent The core function of \textit{student.py}, regarding the model evaluation, is \textit{act}:
+\begin{lstlisting}
+    def act(self, state):
+
+    # convert input state to a torch tensor
+    state = torch.tensor(state/255, dtype=torch.float)
+    state = state.permute(0,2,1).permute(1,0,2)
+    state = state.unsqueeze(0).to(self.device)
+
+    # obs compression
+    z = self.vae.get_latent(state.float())
+    
+    # get action from controller
+    a = self.c(z).to(self.device)   
+
+    if not self.continuous:
+        return (int(torch.argmax(a)) + 1)
+    
+    else:
+        return a.cpu().float().squeeze().detach().numpy()
+\end{lstlisting}
+
+Here the policy select which action to do during a rollout of the simulation. The state observed from the environment is normalized and passed to the VAE, this will output a compressed, but still meaningful, version of the frame to the controller which return the action according to the environment set up.
+
+\subsection{Controller Training Strategy}
+Regarding the training of the controller module we 
+
+
 \newpage
 
 \subsection{Results}
