@@ -35,7 +35,7 @@ import train.train_vae as vae_trainer
 
 class Policy(nn.Module):
     
-    continuous = False
+    continuous = True
 
     def __init__(self, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')):
         super(Policy, self).__init__()
@@ -62,14 +62,11 @@ class Policy(nn.Module):
         self.roller = Rollout()
 
         # cma training parameters
-        self.pop_size = 3
-        self.n_samples = 4
-        self.fixed_seed = 548695 # model2.0
+        self.pop_size = 6
+        self.n_samples = 3
+        self.fixed_seed = 588039 
         self.max_reward = 1000
-        self.expected_reward = 300
-        # stop when reward >= (max_reward - reward)
-        # e.g. stop_condiction=200 and max_reward=1000 --> reward>=800
-        self.stop_condiction = self.max_reward - self.expected_reward 
+        self.stop_condiction = 700 # stop at (1000 - reward) e.g. s.c. = 200 --> reward = 800
 
   
     def act(self, state):
@@ -172,7 +169,7 @@ class Policy(nn.Module):
         # set up cma parameters
         params = self.c.parameters()
         flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
-        es = cma.CMAEvolutionStrategy(flat_params, 0.2, {'popsize':self.pop_size, 'seed': self.fixed_seed})
+        es = cma.CMAEvolutionStrategy(flat_params, 0.2, {'popsize':self.pop_size})
 
         # log variables for cma controller
         display = True
@@ -236,8 +233,8 @@ class Policy(nn.Module):
                 print("Rendering...")
                 self.evaluate(solutions, result_list, render=True, run=3)
 
-            # if cur_mean >= self.target_return:
-            if cur_best <= self.stop_condiction:
+            if cur_mean >= 300:
+            #if cur_best <= self.stop_condiction:
                 print("Terminating controller training with value {}...".format(-cur_best))
                 break
 
