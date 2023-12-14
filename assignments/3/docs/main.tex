@@ -290,7 +290,7 @@ The controller block is implemented as a simple \text{Linear} layer as suggested
 
 \underline{\textit{Discrete case}}: here the output is a 4-dimensional vector where each element represent the probability of choosing one action. Through the \textit{argmax} function the index with the highest probability is selected. I have decide to crop the action-space (the discrete case has 5 possible action) in order to exclude the action do nothing, to do so a +1 is added to the output of \textit{argmax}.\\
 
-\underline{\textit{Continuous case}}: this case is straight forward, the output od the controller here is a 3-dimensional vector, as it is the dimension of the action-space, which is direclty given to the environment step function.\\
+\underline{\textit{Continuous case}}: this case is straight forward, the output od the controller here is a 3\-dimensional vector, as it is the dimension of the action-space, which is direclty given to the environment step function.\\
 
 \noindent The core function of \textit{student.py}, regarding the model evaluation, is \textit{act}:
 \begin{lstlisting}
@@ -348,7 +348,8 @@ Below are listed the  training parameters and hyper-parameters used to reach an 
     \item pop\_size: 6
     \item n\_sample: 3
 \end{itemize}
-With this training setup I needed to perform 3 consecutive run of CMA-ES, each run lasting $\pm$ 22 minutes, in order to obtain a mean cumulative reward of 700. This results has been achieve using the vae trained with the BCE loss. This results can be seen in video \href{https://drive.google.com/drive/folders/1k__Mbe3cCUXCfmbZ8MfM8Zqmpdaix_Ql}{\underline{here}}.
+With this training setup I needed to perform 3 consecutive run of CMA-ES, each run lasting $\pm$ 22 minutes, in order to obtain a mean cumulative reward of 700. This results has been achieve using the vae trained with the BCE loss. This results can be seen in video \href{https://drive.google.com/drive/folders/1k__Mbe3cCUXCfmbZ8MfM8Zqmpdaix_Ql}{\underline{here}}.\\
+Note: the model ist trained to works at best with a continuous environment.
 
 \newpage
 

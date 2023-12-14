@@ -35,7 +35,7 @@ import train.train_vae as vae_trainer
 
 class Policy(nn.Module):
     
-    continuous = True
+    continuous = True # do not chenge to evaluate best model
 
     def __init__(self, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')):
         super(Policy, self).__init__()
