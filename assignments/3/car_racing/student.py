@@ -66,7 +66,8 @@ class Policy(nn.Module):
         self.n_samples = 3
         self.fixed_seed = 588039 
         self.max_reward = 1000
-        self.stop_condiction = 700 # stop at (1000 - reward) e.g. s.c. = 200 --> reward = 800
+        # self.stop_condiction = 700 # stop at (1000 - reward) e.g. s.c. = 200 --> reward = 800
+        self.target_mean = 600 # target mean reward
 
   
     def act(self, state):
@@ -114,62 +115,22 @@ class Policy(nn.Module):
         else:
             self.vae = self.vae.load(self.modules_dir).to(self.device)
 
-            ####DEGUB####
-            # self.vae = self.vae.load('./foo/').to(self.device)
-            # self.vae = torch.load('./foo/vae.pt', map_location=torch.device(self.device))
-            X = torch.load(self.data_dir+'observations.pt').to(self.device)
-            samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
-            decodedSamples, _, _ = self.vae.forward(samples)
-            
-            for index, obs in enumerate(samples):
-                plt.subplot(5, 4, 2*index +1)
-                obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2)).cpu()
-                plt.imshow(obs.numpy(), interpolation='nearest')
-
-            for index, dec in enumerate(decodedSamples):
-                plt.subplot(5, 4, 2*index +2)
-                decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2)).cpu()
-                plt.imshow(decoded.detach().numpy(), interpolation="nearest")
-
-            plt.show()
-    
-            ####DEGUB####
-
-############################ TRAIN CONTROLLER ###############################
-#############################################################################
-
-        
-
-        # ####DEGUB####
-        # go = 0 
-        # for p in self.c.parameters():
-        #     print('previous parameters: {}'.format(p))
-        #     go += 1
-        #     if go == 3 :break
-        # ####DEGUB####
-       
+        # Train controller
         print("Attempting to load previous best...")
-        # define current best as max
+       
         cur_best = 100000000000 # max cap
+        cur_mean = -100000000000 # min cap
         file_name = 'controller.pt' if not self.continuous else 'continuous.pt'
         if exists(self.modules_dir+file_name): 
             self.c = self.c.load(self.modules_dir)
             print("Previous controller loaded")
-            # cur_best = self.c.load(self.modules_dir, get_value=True)
+            cur_best = self.c.load(self.modules_dir, get_value=True)
             print("Best current value for the objective function: {}".format(cur_best))
-
-        # ####DEGUB####
-        # go = 0
-        # for p in self.c.parameters():
-        #     print('after parameters: {}'.format(p))
-        #     go += 1
-        #     if go == 3 :break
-        # ####DEGUB####
 
         # set up cma parameters
         params = self.c.parameters()
         flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
-        es = cma.CMAEvolutionStrategy(flat_params, 0.2, {'popsize':self.pop_size})
+        es = cma.CMAEvolutionStrategy(flat_params, 0.2, {'popsize':self.pop_size}) #'seed':self.fixed_seed
 
         # log variables for cma controller
         display = True
@@ -179,8 +140,9 @@ class Policy(nn.Module):
         print("Generation {}".format(generation+1))
 
         while not es.stop(): 
-            
-            if cur_best <= self.stop_condiction:
+
+            if cur_mean >= self.target_mean:
+            # if cur_best <= self.stop_condiction:
                 print("Already better than the target value")
                 print("Stop training...")
                 break
@@ -233,7 +195,7 @@ class Policy(nn.Module):
                 print("Rendering...")
                 self.evaluate(solutions, result_list, render=True, run=3)
 
-            if cur_mean >= 300:
+            if cur_mean >= self.target_mean:
             #if cur_best <= self.stop_condiction:
                 print("Terminating controller training with value {}...".format(-cur_best))
                 break
