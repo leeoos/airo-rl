@@ -177,14 +177,15 @@ The new value for $\theta$ is given by:
 The task of this assignment was to solve the CarRacing-v2 gym environment using one of the proposed algorithms. A complete description of the environment is reported on \href{https://www.gymlibrary.dev/environments/box2d/car_racing/}{\underline{gym  car-racing website}}. The generated track is random every episode, the observation states consists of 96x96 pixels images. The reward is $-0.1$ every frame and $+1000/N$ for every track tile visited, where N is the total number of tiles visited in the track. This means that agent would receive higher reward for completing the track in a shorter amount of time, this also means that in general moving is better than do nothing (even if sometimes it means to move off-track). From this observation we can conclude that the reward is not a perfect metric to evaluate the performance of the car but it's still a good way to influence its behavior. 
 
 \subsection{Solution Strategy}
-The strategy chosen among the proposed solution is the one implemented on \textit{World Models} \cite{DBLP:journals/corr/abs-1803-10122}, I along with my colleagues, listed as main Contributors, have implemented a simplified version of the model proposed in the paper. The main idea expressed in the paper is to combine three different models (see fig.1) in order to obtain the best performance from the agent. 
+The strategy chosen among the proposed solution is the one presented on \textit{World Models} \cite{DBLP:journals/corr/abs-1803-10122}. I, along with my colleagues listed as main Contributors, have implemented a simplified version of the model proposed in the paper. The main idea expressed in their work is to combine three different models (see fig.1) in order to obtain the best performance from the agent. 
 \begin{itemize}
-    \item A Variational Auto Encoder: used for feature extraction and state representation;
-    \item A MDN-RNN (LSTM): used to keep a memory of the , we also want to compress
-    what happens over time. For this purpose, the role of the
-    M model is to predict the future. The M model serves as a
-    predictive model of the future
+    \item A Variational Auto Encoder (V) used for feature extraction and state representation (z);
+    \item A MDN-RNN (M) as a predictive model of the future z vectors that V is expected to produce;
+    \item A Controller responsible for selecting the action for the agent given the current observation (z) and the temporal information (h) given by M.
 \end{itemize}
+We have decide to reduce the size of the model by removing the M module since \dots
+The rest of the implementation is build around the Variational Auto Encoder that we have coded from scratch and the CMA-ES training strategy for the Controller for which we have took inspiration from a Github repository that has implemented as similar version of World Models \cite{ctallec-wm}.  
+
 \newpage
 
 \subsection{Code Structure}
@@ -209,7 +210,7 @@ The task of collecting random frames from the environment, in order to give the 
 All data are then saved inside the local directory dataset, this directory is not contained in the zip file because of its size. The collected data are the one used to train the Neural Networks components of the architecture.
 \newpage
 \subsection{Variational Auto Encoder}
-The Variational Auto Encoder (VAE) implemented for this assignment is a "vanilla" auto-encoder consisting of 3 \textit{Convolutional} layers and one \textit{Adaptive Pooling} for the encoder, two \textit{Linear} layers for computing $\mu$ and $\sigma$ and a combination of one \textit{Linear} layer and 3 \textit{Transposed Convolutional} for the decoder.
+The Variational Auto Encoder (VAE) implemented for this assignment is a "vanilla" auto-encoder consisting of 3 \textit{Convolutional} layers and one \textit{Adaptive Pooling} for the encoder, two \textit{Linear} layers for computing $\mu$ and $\sigma$ and a combination of one \textit{Linear} layer and 3 \textit{Transposed Convolutional} for the decoder. The encoder reduce the dimensionality of the input images to a tensor of shape (1, 1025). This vector is then used to compute the latent space $z$ of size 32, this is a good enough compression of the original frames. The only manipulation applied to the images was a normalization of the pixels value between 0 and 1. The lightweight nature of the network has shown advantages both in training and in the application. The model required a short amount of training time while showing good result in the image compression/reconstruction. 
 \subsubsection{VAE Training Strategy}
 The training phase of the auto-encoder was carried on using different evaluation functions over the reconstructed images as inputs and the original images as target. The main loss used was the Kullback-Leibler Divergence (KDL) combined alteratively  with and the Mean Square Error (MSE) and the Weighted Binary Cross Entropy (BCE). The former performed best in terms of numerical loss values but the latter perform better in terms of final images reconstruction.\\
 Here are the expression of the functions:
@@ -231,6 +232,40 @@ INSERT IMAGES HERE
 % \newpage
 
 \subsection*{Controller}
+The controller block is implemented as a simple \text{Linear} layer as suggested in the paper. There are two scripts inside the \textbf{modules} directory that represents two similar controllers, one to be used in a discrete environment (\textit{discrete.py}) the other (\textit{continuous.py}) for the continuous case. As we decide to not add the MDN-RNN module to the final architecture the dimensionality  of the input expected by the controller coincide exactly with the size of the latent space of the VAE. The output is different for the two cases:\\
+
+\underline{\textit{Discrete case}}: here the output is a 4-dimensional vector where each element represent the probability of choosing one action. Through the \textit{argmax} function the index with the highest probability is selected. I have decide to crop the action-space (the discrete case has 5 possible action) in order to exclude the action do nothing, to do so a +1 is added to the output of \textit{argmax}.\\
+
+\underline{\textit{Continuous case}}: this case is straight forward, the output od the controller here is a 3-dimensional vector, as it is the dimension of the action-space, which is direclty given to the environment step function.\\
+
+\noindent The core function of \textit{student.py}, regarding the model evaluation, is \textit{act}:
+\begin{lstlisting}
+    def act(self, state):
+
+    # convert input state to a torch tensor
+    state = torch.tensor(state/255, dtype=torch.float)
+    state = state.permute(0,2,1).permute(1,0,2)
+    state = state.unsqueeze(0).to(self.device)
+
+    # obs compression
+    z = self.vae.get_latent(state.float())
+    
+    # get action from controller
+    a = self.c(z).to(self.device)   
+
+    if not self.continuous:
+        return (int(torch.argmax(a)) + 1)
+    
+    else:
+        return a.cpu().float().squeeze().detach().numpy()
+\end{lstlisting}
+
+Here the policy select which action to do during a rollout of the simulation. The state observed from the environment is normalized and passed to the VAE, this will output a compressed, but still meaningful, version of the frame to the controller which return the action according to the environment set up.
+
+\subsection{Controller Training Strategy}
+Regarding the training of the controller module we 
+
+
 \newpage
 
 \subsection{Results}
