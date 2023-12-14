@@ -9,13 +9,13 @@ from os import mkdir, unlink, listdir, getpid, remove
 
 ACTIONS = 4
 
-class Controller(nn.Module):
+class Discrete(nn.Module):
     """ Controller """
 
     def __init__(self):
         super().__init__()
 
-        self.name = 'CONTROLLER'
+        self.name = 'DISCRETE'
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         # discrete

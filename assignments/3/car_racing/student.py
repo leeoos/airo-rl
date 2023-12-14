@@ -18,8 +18,8 @@ import numpy as np
 import gymnasium as gym
 
 # custom imports
-from modules.controller import ACTIONS
-from modules.controller import Controller
+from modules.discrete import ACTIONS
+from modules.discrete import Discrete
 
 from modules.continuous import CONTINUOUS
 from modules.continuous import Continuous
@@ -53,7 +53,7 @@ class Policy(nn.Module):
 
         self.c = None
         if not self.continuous:
-            self.c = Controller().to(self.device)
+            self.c = Discrete().to(self.device)
 
         else:
             self.c = Continuous().to(self.device)
@@ -121,7 +121,7 @@ class Policy(nn.Module):
        
         cur_best = 100000000000 # max cap
         cur_mean = -100000000000 # min cap
-        file_name = 'controller.pt' if not self.continuous else 'continuous.pt'
+        file_name = 'discrete.pt' if not self.continuous else 'continuous.pt'
         if exists(self.modules_dir+file_name): 
             self.c = self.c.load(self.modules_dir)
             print("Previous controller loaded")
