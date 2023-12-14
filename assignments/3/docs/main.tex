@@ -67,7 +67,7 @@
 \newpage
 
 \section{Theory}
-\subsection{Exercise 1}
+\subsection{Exercise}
 In the context of this exercise, we need to consider an environment that allows two possible actions and features a two-dimensional state representation, denoted as $x(s)\in R^2$. This scenario involves the application of the 1-step Actor-Critic Algorithm with specific policy and action-state value function approximators:
 
 \begin{gather*}
@@ -174,19 +174,26 @@ The new value for $\theta$ is given by:
 \section{World Models}
  
 \subsection{Task Overview}
-The task of this assignment was to solve the CarRacing-v2 gym environment using one of the proposed algorithms. A complete description of the environment is reported on \href{https://www.gymlibrary.dev/environments/box2d/car_racing/}{\underline{gym  car-racing website}}. The generated track is random every episode, the observation states consists of 96x96 pixels images. The reward is $-0.1$ every frame and $+1000/N$ for every track tile visited, where N is the total number of tiles visited in the track. This means that agent would receive higher reward for completing the track in a shorter amount of time, this also means that in general moving is better than do nothing (even if sometimes it means to move off-track). From this observation we can conclude that the reward is not a perfect metric to evaluate the performance of the car but it's still a good way to influence its behavior. 
+The task of this assignment was to solve the CarRacing-v2 gym environment using one of the proposed algorithms. A complete description of the environment is reported on \href{https://www.gymlibrary.dev/environments/box2d/car_racing/}{\underline{gym  car-racing website}}. The generated track is random every episode, the observation states consists of 96x96 pixels images. The reward is -0.1 every frame and +$1000/N$ for every track tile visited, where N is the total number of tiles visited in the track. This means that agent would receive higher reward for completing the track in a shorter amount of time, this also means that in general moving is better than do nothing (even if sometimes it means to move off-track). From this observation we can conclude that the reward is not a perfect metric to evaluate the performance of the car but it's still a good way to influence its behavior. 
 
 \subsection{Solution Strategy}
-The strategy chosen among the proposed solution is the one presented on \textit{World Models} \cite{DBLP:journals/corr/abs-1803-10122}. I, along with my colleagues listed as main Contributors, have implemented a simplified version of the model proposed in the paper. The main idea expressed in their work is to combine three different models (see fig.1) in order to obtain the best performance from the agent. 
+The strategy chosen among the proposed solution is the one presented on \textit{World Models} \cite{DBLP:journals/corr/abs-1803-10122}. I, along with my colleagues listed as main Contributors, have implemented a simplified version of the model proposed in the paper. The main idea expressed in their work is to combine three different models (see \ref{fig:wm}) in order to obtain the best performance from the agent. 
 \begin{itemize}
     \item A Variational Auto Encoder (V) used for feature extraction and state representation (z);
     \item A MDN-RNN (M) as a predictive model of the future z vectors that V is expected to produce;
     \item A Controller responsible for selecting the action for the agent given the current observation (z) and the temporal information (h) given by M.
 \end{itemize}
-We have decide to reduce the size of the model by removing the M module since \dots
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/wm.png} 
+    \caption{}
+    \label{fig:wm}
+\end{figure}
+
+
+\noindent We have decide to reduce the size of the model by removing the M module. This choice was due to two main reasons. The firs one is that there are experimental results that shows that for this specific environment a good compression of the observation is way more relevant that the temporal "compression" provided by the RNN. The second reason relies in the complexity of efficiently training a Mixture Density Network combined with an Long Short Term Memory module. 
 The rest of the implementation is build around the Variational Auto Encoder that we have coded from scratch and the CMA-ES training strategy for the Controller for which we have took inspiration from a Github repository that has implemented as similar version of World Models \cite{ctallec-wm}.  
 
-\newpage
 
 \subsection{Code Structure}
 The assignment directory is organized in modular components according to the implementation logic of World Models. Here it is a summary of the general structure:
@@ -208,29 +215,76 @@ The task of collecting random frames from the environment, in order to give the 
     \item \textit{Continuous case}: sample one action from the continuous action space (dim=3) of the environment. To action is then added a weighted random sample extracted from a normal distribution to increase the change of performing "strange action in order to gather more generalized information. 
 \end{itemize}
 All data are then saved inside the local directory dataset, this directory is not contained in the zip file because of its size. The collected data are the one used to train the Neural Networks components of the architecture.
-\newpage
+
+
 \subsection{Variational Auto Encoder}
 The Variational Auto Encoder (VAE) implemented for this assignment is a "vanilla" auto-encoder consisting of 3 \textit{Convolutional} layers and one \textit{Adaptive Pooling} for the encoder, two \textit{Linear} layers for computing $\mu$ and $\sigma$ and a combination of one \textit{Linear} layer and 3 \textit{Transposed Convolutional} for the decoder. The encoder reduce the dimensionality of the input images to a tensor of shape (1, 1025). This vector is then used to compute the latent space $z$ of size 32, this is a good enough compression of the original frames. The only manipulation applied to the images was a normalization of the pixels value between 0 and 1. The lightweight nature of the network has shown advantages both in training and in the application. The model required a short amount of training time while showing good result in the image compression/reconstruction. 
 \subsubsection{VAE Training Strategy}
-The training phase of the auto-encoder was carried on using different evaluation functions over the reconstructed images as inputs and the original images as target. The main loss used was the Kullback-Leibler Divergence (KDL) combined alteratively  with and the Mean Square Error (MSE) and the Weighted Binary Cross Entropy (BCE). The former performed best in terms of numerical loss values but the latter perform better in terms of final images reconstruction.\\
+The training phase of the auto-encoder was carried on using different evaluation functions over the reconstructed images as inputs and the original images as target. The main loss used was the Kullback-Leibler Divergence (KDL) combined alteratively  with and the Mean Square Error (MSE) and the Weighted Binary Cross Entropy (BCE). The former performed best in terms of loss values (\ref{fig:mse}) but the latter perform better in terms of final images reconstruction (\ref{fig:bce}).\\
 Here are the expression of the functions:
 \begin{gather}
     \text{KLD} = -\frac{1}{2} \sum_{j=1}^J (1 + \log((\sigma_j)^2) - (\mu_j)^2 - (\sigma_j)^2) \\
+    \\
     \text{MSE} = \frac{1}{N} \sum_{i=1}^N (y_i - \hat{y}_i)^2 \\
+    \\
     \text{BCE} = -\frac{1}{N} \sum_{i=1}^N [y_i \log(\hat{y}_i) + (1 - y_i) \log(1 - \hat{y}_i)]
 \end{gather}
-This plots show  the evolution of the loss functions during training.
-INSERT PLOT HERE
+\newpage
+\noindent The following plots show the evolution of the loss functions during training.
+\begin{figure*}[h!]
+    \centering
+    \includegraphics[width=1\textwidth]{./images/mse_loss.png}
+    \caption{}
+    \label{fig:mse}
+\end{figure*}
 
-\subsubsection{VAE Results}
-The following are the results images reconstructed by the VAE. It can be notice that when the track is straight the network is able to reconstruct it pretty well, capturing also the features of the red racing curb. On the other hand, when there is a hairpin turn the results are poor, leading to bad performance of the car in this environmental conditions.
-INSERT IMAGES HERE
+\begin{figure*}[h!]
+    \centering
+    \includegraphics[width=1\textwidth]{./images/bce_loss.png}
+    \caption{}
+    \label{fig:bce}
+\end{figure*}
 
 \newpage
+\subsubsection{VAE Results}
+The following are the images reconstructed by the VAE. The original images are placed on the even columns while the reconstruction are on the odd columns. For the first set of images (\ref{fig:vaemse}) it can be notice that when the track is straight the network is able to reconstruct it pretty well, capturing also the features of the red racing curb. On the other hand, when there is a hairpin turn the results are poor, leading to worst performance of the car in this environmental conditions.
 
-% \subsection{RNN}
-% \newpage
+\begin{figure*}[h!]
+    \centering
+    \includegraphics[width=0.6\textwidth]{images/mse/good.png}
+    \caption{Frames reconstructed using a VAE trained with MSE loss.}
+    \label{fig:vaemse}
+\end{figure*}
 
+% \begin{figure}[h]
+%     \centering
+%     \subfloat[\centering good reconstaruction]{{\includegraphics[width=5cm]{images/mse/good.png} }}%
+%     \qquad
+%     \subfloat[\centering bad reconstruction]{{\includegraphics[width=5cm]{images/mse/bad.png} }}%
+%     \caption{Frames reconstructed using a VAE trained with MSE loss.}%
+%     \label{fig:vaemse}
+% \end{figure}
+
+\noindent About the second set (\ref{fig:vaebce}) it is possible to see some improvement also with respect to the representation of hairpin turn. This has a huge impact on the final performance of the agent.
+
+\begin{figure*}[h!]
+    \centering
+    \includegraphics[width=0.6\textwidth]{images/bce/good.png}
+    \caption{Frames reconstructed using a VAE trained with BCE loss.}
+    \label{fig:vaebce}
+\end{figure*}
+
+% \begin{figure}[h]
+%     \centering
+%     \subfloat[\centering good]{{\includegraphics[width=5cm]{images/bce/good.png} }}%
+%     \qquad
+%     \subfloat[\centering bad]{{\includegraphics[width=5cm]{images/bce/bad.png} }}%
+%     \caption{Frames reconstructed using a VAE trained with BCE loss.}%
+%     \label{fig:vaebce}
+% \end{figure}
+
+
+\newpage
 \subsection*{Controller}
 The controller block is implemented as a simple \text{Linear} layer as suggested in the paper. There are two scripts inside the \textbf{modules} directory that represents two similar controllers, one to be used in a discrete environment (\textit{discrete.py}) the other (\textit{continuous.py}) for the continuous case. As we decide to not add the MDN-RNN module to the final architecture the dimensionality  of the input expected by the controller coincide exactly with the size of the latent space of the VAE. The output is different for the two cases:\\
 
@@ -255,7 +309,6 @@ The controller block is implemented as a simple \text{Linear} layer as suggested
 
     if not self.continuous:
         return (int(torch.argmax(a)) + 1)
-    
     else:
         return a.cpu().float().squeeze().detach().numpy()
 \end{lstlisting}
@@ -263,13 +316,39 @@ The controller block is implemented as a simple \text{Linear} layer as suggested
 Here the policy select which action to do during a rollout of the simulation. The state observed from the environment is normalized and passed to the VAE, this will output a compressed, but still meaningful, version of the frame to the controller which return the action according to the environment set up.
 
 \subsection{Controller Training Strategy}
-Regarding the training of the controller module we 
+Regarding the training of the controller module we have followed the same approach suggested by the original paper and have decided to implement the Covariance Matrix Adaptation Evolution Strategy.  It's a method used for optimizing complex functions, often in situations where the function's form is not known in advance or is difficult to analyze. In our case the objective function to minimize was the difference between the max expected reward (1000) and the sum of cumulative rewards returned after the performance of a single rollout. CMA-ES doesn't make entirely random changes. Instead, it learns which changes are more likely to lead to better solutions\footnote[1]{In this context the solution returned by the cma algorithm are the controller parameters}. In it is possible to see intuitively how the CMA algorithms shapes the data covariance Matrix in order to make the solution to converge to a minimum.
+\vspace*{5pt}
+\begin{center}
+    \includegraphics[width=0.7\textwidth]{images/cma-es.png} \label{fig:cma}
+\end{center}
+In order to apply this method we have imported in our code the \textit{python cma} library. Here it is a simplified version of the evolution procedure:
+\begin{lstlisting}
+    es = cma.CMAEvolutionStrategy(xo, sigma, pop_size)
+    while not es.stop():
+        solutions = es.ask()
+        es.tell(solutions, [cma.ff.rosen(s) for s in solutions])
+        es.disp()
+    es.result_pretty()
+\end{lstlisting}
+The parameters passed to CMAEvolutionStrategy represent:
+\begin{itemize}
+    \item x0: initial solution, starting point, the current parameters of the controller;
+    \item sigam: initial standard deviation, which will be changed by the algorithm;
+    \item pop\_size: the population size or number of solution computed for each generation.
+\end{itemize}
 
-
-\newpage
+The training process was scheduled following a series of steps in order to achieve the best possible results with limited resources. The bottleneck for the training of the entire model was in fact given by the training of this specific module. This is due to two main reason: one is the complexity of the genetic algorithm which is proportional to phe population size, the other is the heavy load on the cpu produced by the rollout necessary to compute the objective function. For those reasons I have decided to split the training in progressive phases iteratively saving the new best parameter and restarting the training from the saved checkpoints. The stop condition was defined by setting a a goal target for the mean cumulative reward. This approach has lead to a more manageable training and pretty good results in terms of performance. Furthermore in order to reduce the population size and average out the results I have set a fixed number of sample to take from each element of the population. This was the same method used in the code from \cite{ctallec-wm} but in that context it was done with the purpose of combining the performance of multiple threads acting on the evaluation of the same solutions. In every case, since the environment is stochastic, a given solution could lead to much different results so the approach of taking more than one sample per solution seems reasonable.\
 
 \subsection{Results}
-\newpage
+Below are listed the  training parameters and hyper-parameters used to reach an average of 700 points as reward:
+\begin{itemize}
+    \item environment setting: continuous;
+    \item x0: initial controller parameters;
+    \item sigma: 0.2;
+    \item pop\_size: 6
+    \item n\_sample: 3
+\end{itemize}
+With this training setup I needed to perform 3 consecutive run of CMA-ES, each run lasting $\pm$ 22 minutes, in order to obtain a mean cumulative reward of 700. This results has been achieve using the vae trained with the BCE loss. This results can be seen in video \href{https://drive.google.com/drive/folders/1k__Mbe3cCUXCfmbZ8MfM8Zqmpdaix_Ql}{\underline{here}}.
 
 \newpage
 

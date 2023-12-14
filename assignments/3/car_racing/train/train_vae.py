@@ -32,11 +32,12 @@ def train_vae(model,
     optimizer = torch.optim.Adam(model.parameters(), lr=lr_)
 
     model.train()
-    # train_loss = 0
-    # log_step = (len(dataloader.dataset) // batch_size) // 2
+    training_losses = []  # List to store the training losses
+
     print("Training VAE")
 
     for epoch in range(epochs):
+        epoch_loss = 0
         for batch_idx,  data in enumerate(dataloader):
             inputs, targets = data
             inputs = inputs.to(device)
@@ -49,8 +50,13 @@ def train_vae(model,
             
             # Backward pass and optimization
             loss.backward()
-            # train_loss += loss.item()
             optimizer.step()
+            # Accumulate the loss
+            epoch_loss += loss.item()
+
+        # Calculate the average loss for the epoch
+        average_loss = epoch_loss / len(dataloader)
+        training_losses.append(average_loss)  # Store the average loss
 
         if (epoch + 1) % 10 == 0:
             print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
@@ -58,6 +64,8 @@ def train_vae(model,
     if save_dir: 
         print("Saving model ...")
         model.save(save_dir)
+        training_losses = np.array(training_losses)
+        np.save('losses.npy', training_losses) 
     return model
 
 
@@ -109,31 +117,19 @@ if __name__ == "__main__":
             vae_model = vae_model.load(modules_dir).to(device)
 
 
-        env = gym.make('CarRacing-v2', continuous=False, render_mode='rgb_array')
-        _, _ = env.reset()
-        done = False
-        t = 0
-        X = []
-        while not done:
-            action = int(np.random.rand() *3 +1)
-            t += 1
-            observation, reward, terminated, truncated, info = env.step(action)
-            done = truncated or terminated
-            observation = torch.from_numpy(observation).float() / 255
-            X.append(observation)
-
-        X = torch.stack(X, dim=0)
-        X = X.permute(0,1,3,2).permute(0,2,1,3).to(device)
+        X = torch.load(data_dir+'observations.pt')
+        # X = torch.stack(X, dim=0)
+        # X = X.permute(0,1,3,2).permute(0,2,1,3).to(device)
         
         samples = X[(np.random.rand(10)*X.shape[0]).astype(int)]
-        decodedSamples, _, _ = vae_model.forward(samples)
+        decoded_samples, _, _ = vae_model.forward(samples)
         
         for index, obs in enumerate(samples):
             plt.subplot(5, 4, 2*index +1)
             obs = torch.movedim(obs, (1, 2, 0), (0, 1, 2)).cpu()
             plt.imshow(obs.numpy(), interpolation='nearest')
 
-        for index, dec in enumerate(decodedSamples):
+        for index, dec in enumerate(decoded_samples):
             plt.subplot(5, 4, 2*index +2)
             decoded = torch.movedim(dec, (1, 2, 0), (0, 1, 2)).cpu()
             plt.imshow(decoded.detach().numpy(), interpolation="nearest")

@@ -62,12 +62,13 @@ class Policy(nn.Module):
         self.roller = Rollout()
 
         # cma training parameters
+        self.sigma = 0.2
         self.pop_size = 6
         self.n_samples = 3
         self.fixed_seed = 588039 
         self.max_reward = 1000
         # self.stop_condiction = 700 # stop at (1000 - reward) e.g. s.c. = 200 --> reward = 800
-        self.target_mean = 700 # target mean reward
+        self.target_mean = 800 # target mean reward
 
   
     def act(self, state):
@@ -130,7 +131,7 @@ class Policy(nn.Module):
         # set up cma parameters
         params = self.c.parameters()
         flat_params = torch.cat([p.detach().view(-1) for p in params], dim=0).cpu().numpy()
-        es = cma.CMAEvolutionStrategy(flat_params, 0.2, {'popsize':self.pop_size}) #'seed':self.fixed_seed
+        es = cma.CMAEvolutionStrategy(flat_params, self.sigma, {'popsize':self.pop_size}) #'seed':self.fixed_seed
 
         # log variables for cma controller
         display = True
